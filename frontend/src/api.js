@@ -19,7 +19,8 @@ async function request(path, options = {}) {
 }
 
 // ── Game ──────────────────────────────────────────────────────────────────────
-export const getCategories   = ()           => request('/game/categories');
+export const getCategories   = (ownedCategories = []) => request('/game/categories', { method: 'POST', body: { ownedCategories } });
+export const getAllCategories = ()           => request('/game/all-categories');
 export const getQuestion     = (category, isPie) => request('/game/question', { method: 'POST', body: { category, isPie } });
 export const markAnswered    = (questionId) => request('/game/answer',   { method: 'POST', body: { questionId } });
 export const getBankCount    = ()           => request('/game/bank-count');
