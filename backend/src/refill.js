@@ -24,10 +24,14 @@ const DISTRIBUTION = {
 const SYSTEM_PROMPT = `You are generating trivia questions for a Trivial Pursuit-style game played by Canadian teenagers (ages 13–18) and their parents (Boomers and Gen X, ages 40–60).
 
 RULES:
-- Questions must be FUN, SPECIFIC, and not too easy — Trivial Pursuit style (not "What colour is the sky?")
+- Questions must be written in TRUE Trivial Pursuit style — they are longer, richer, and more interesting than simple one-liners
+- A good Trivial Pursuit question gives CONTEXT before asking — it teaches you something even if you get it wrong
+- Example of BAD question: "What year did the Berlin Wall fall?" 
+- Example of GOOD question: "After nearly three decades of dividing East and West Germany and becoming the defining symbol of the Cold War, in what year did the Berlin Wall finally come down?"
+- Questions should be 2-3 sentences long — set the scene, then ask
 - 90% of questions should be about GLOBAL topics — not Canadian
 - Only 10% should be specifically Canadian
-- Pie questions are HARDER than regular questions but still single-answer — ask for one precise fact that requires real knowledge to get right (exact year, exact record, exact name). NOT multi-part. One clean question, one clean answer.
+- Pie questions are HARDER — require a very precise answer (exact year, exact number, exact name) that only someone who really knows their stuff would get
 - Answers must be concise and unambiguous — one clear correct answer
 - No duplicate questions
 
@@ -81,18 +85,27 @@ async function generateBatch(batchNum) {
 
   const text = response.choices[0]?.message?.content || '';
 
-  // GPT with json_object mode wraps arrays — unwrap if needed
-  let parsed;
+  // GPT with json_object mode always wraps in an object — unwrap
   const obj = JSON.parse(text);
-  // If GPT returned { questions: [...] } or similar, unwrap it
-  parsed = Array.isArray(obj) ? obj : (obj.questions || obj.trivia || Object.values(obj)[0]);
+  let parsed;
+  if (Array.isArray(obj)) {
+    parsed = obj;
+  } else {
+    // Find the first array value in the object regardless of key name
+    const arrays = Object.values(obj).filter(v => Array.isArray(v));
+    parsed = arrays.length > 0 ? arrays[0] : [];
+  }
 
-  // Validate each question has required fields and valid category
-  return parsed.filter(q =>
-    q.category && CATEGORIES.includes(q.category) &&
-    q.question && q.answer &&
-    typeof q.is_pie === 'boolean'
-  );
+  // Loose validation — just need category, question, answer
+  return parsed
+    .filter(q => q && q.category && q.question && q.answer && CATEGORIES.includes(q.category))
+    .map(q => ({
+      category: q.category,
+      question: q.question,
+      answer: q.answer,
+      is_pie: q.is_pie === true,
+      canadian: q.canadian === true,
+    }));
 }
 
 async function refillBank() {
