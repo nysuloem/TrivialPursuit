@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import PieDisplay, { CATEGORIES, CAT_COLORS, CAT_EMOJI } from './PieDisplay';
-import { getCategories, getQuestion, markAnswered, getBankCount } from '../api';
+import { getCategories, getAllCategories, getQuestion, markAnswered, getBankCount } from '../api';
 
 // ─── SOUND ENGINE (Web Audio API — no files needed) ────────────────────────
 function createAudioCtx() {
@@ -94,9 +94,11 @@ const TEAMS = [
 const S = {
   CHOOSING:    'choosing',
   QUESTION:    'question',
-  PIE_INTRO:   'pie_intro',   // animated pie reveal screen
-  PIE:         'pie',         // pie question active
-  STEAL:       'steal',       // other team can steal
+  PIE_INTRO:   'pie_intro',
+  PIE:         'pie',
+  STEAL:       'steal',
+  FINAL_PICK:  'final_pick',   // opponent picks final question category
+  FINAL:       'final',        // final question active
   WINNER:      'winner',
 };
 
@@ -296,9 +298,9 @@ export default function Game() {
   const [active,     setActive]     = useState(0);
   const [scores,     setScores]     = useState([0, 0]);
   const [wedges,     setWedges]     = useState([[], []]);
-  // streak is now per-team per-category: [{ Geography: 1, History: 2, ... }, { ... }]
   const [streak,     setStreak]     = useState([{}, {}]);
   const [catOptions, setCatOptions] = useState([]);
+  const [allCats,    setAllCats]    = useState(CATEGORIES);
   const [chosenCat,  setChosenCat]  = useState(null);
   const [question,   setQuestion]   = useState(null);
   const [revealed,   setRevealed]   = useState(false);
@@ -307,22 +309,27 @@ export default function Game() {
   const [error,      setError]      = useState(null);
   const [flash,      setFlash]      = useState(null);
   const [winner,     setWinner]     = useState(null);
+  // finalTeam = team that has all wedges and needs final question
+  const [finalTeam,     setFinalTeam]     = useState(null);
+  // categories already used for final question attempts — can't be picked again
+  const [finalUsedCats, setFinalUsedCats] = useState([]);
 
   useEffect(() => {
     getBankCount().then(d => setBankCount(d.count)).catch(() => {});
   }, []);
 
-  const loadCategoryOptions = useCallback(async () => {
+  const loadCategoryOptions = useCallback(async (activeTeam, currentWedges) => {
     setLoading(true); setError(null);
     try {
-      const data = await getCategories();
+      const owned = currentWedges ? currentWedges[activeTeam ?? 0] : [];
+      const data = await getCategories(owned);
       setCatOptions(data.categories);
       setState(S.CHOOSING);
     } catch (e) { setError(e.message); }
     finally { setLoading(false); }
   }, []);
 
-  useEffect(() => { loadCategoryOptions(); }, [loadCategoryOptions]);
+  useEffect(() => { loadCategoryOptions(0, [[], []]); }, [loadCategoryOptions]);
 
   const triggerFlash = (type) => {
     setFlash(type);
@@ -373,6 +380,18 @@ export default function Game() {
     return newWedges;
   };
 
+  // Check if a team just completed all wedges — if so, trigger final question
+  const checkForFinal = (teamIdx, newWedges, nextActive) => {
+    if (newWedges[teamIdx].length === CATEGORIES.length) {
+      setFinalTeam(teamIdx);
+      setFinalUsedCats([]); // reset used categories for fresh final run
+      setActive(teamIdx);
+      setState(S.FINAL_PICK);
+      return true;
+    }
+    return false;
+  };
+
   const handleCorrect = async () => {
     await consumeQuestion();
     triggerFlash('correct');
@@ -380,36 +399,29 @@ export default function Game() {
     newScores[active] += 1;
     setScores(newScores);
 
+    if (state === S.FINAL) {
+      // Won the final question — game over!
+      setWinner(active);
+      setState(S.WINNER);
+      return;
+    }
+
     if (state === S.PIE) {
-      // Win wedge
       const newWedges = awardWedge(active, chosenCat, wedges);
       setWedges(newWedges);
       playWedgeWon(getAudio());
+      setStreak(prev => { const n=[...prev]; n[active]={...n[active],[chosenCat]:0}; return n; });
 
-      if (newWedges[active].length === CATEGORIES.length) {
-        setWinner(active); setState(S.WINNER); return;
-      }
-      // Reset streak for this category only
-      setStreak(prev => {
-        const n = [...prev];
-        n[active] = { ...n[active], [chosenCat]: 0 };
-        return n;
-      });
-      await loadCategoryOptions();
+      if (checkForFinal(active, newWedges, active)) return;
+      await loadCategoryOptions(active, newWedges);
       return;
     }
 
     // Regular question — increment streak for THIS category only
-    // Other category streaks are preserved
     const catStreak = (streak[active][chosenCat] || 0) + 1;
-    setStreak(prev => {
-      const n = [...prev];
-      n[active] = { ...n[active], [chosenCat]: catStreak };
-      return n;
-    });
+    setStreak(prev => { const n=[...prev]; n[active]={...n[active],[chosenCat]:catStreak}; return n; });
 
     if (catStreak >= STREAK_NEEDED && !wedges[active].includes(chosenCat)) {
-      // Pie unlocked — fetch pie question then show intro
       setLoading(true);
       try {
         const data = await getQuestion(chosenCat, true);
@@ -420,19 +432,20 @@ export default function Game() {
       } catch (e) { setError(e.message); }
       finally { setLoading(false); }
     } else {
-      await loadCategoryOptions();
+      await loadCategoryOptions(active, wedges);
     }
   };
 
   const handleWrong = async () => {
     await consumeQuestion();
     triggerFlash('wrong');
-    // Only reset streak for the category they got wrong
-    setStreak(prev => {
-      const n = [...prev];
-      n[active] = { ...n[active], [chosenCat]: 0 };
-      return n;
-    });
+    setStreak(prev => { const n=[...prev]; n[active]={...n[active],[chosenCat]:0}; return n; });
+
+    if (state === S.FINAL) {
+      // Wrong on final — go back to opponent picking again (different category)
+      setState(S.FINAL_PICK);
+      return;
+    }
 
     if (state === S.PIE) {
       playStealSting(getAudio());
@@ -440,14 +453,14 @@ export default function Game() {
       return;
     }
 
-    setActive(a => 1 - a);
-    await loadCategoryOptions();
+    const nextTeam = 1 - active;
+    setActive(nextTeam);
+    await loadCategoryOptions(nextTeam, wedges);
   };
 
   const handleSkip = async () => {
     await consumeQuestion();
-    // Skip doesn't affect streak
-    await loadCategoryOptions();
+    await loadCategoryOptions(active, wedges);
   };
 
   // Steal: other team answers correctly
@@ -460,25 +473,30 @@ export default function Game() {
     const newWedges = awardWedge(stealingTeam, chosenCat, wedges);
     setWedges(newWedges);
     playWedgeWon(getAudio());
+    setStreak(prev => { const n=[...prev]; n[stealingTeam]={...n[stealingTeam],[chosenCat]:0}; return n; });
 
-    if (newWedges[stealingTeam].length === CATEGORIES.length) {
-      setWinner(stealingTeam); setState(S.WINNER); return;
-    }
+    if (checkForFinal(stealingTeam, newWedges, stealingTeam)) return;
 
-    // Stealing team gets a bonus turn, reset their streak for this cat
-    setStreak(prev => {
-      const n = [...prev];
-      n[stealingTeam] = { ...n[stealingTeam], [chosenCat]: 0 };
-      return n;
-    });
     setActive(stealingTeam);
-    await loadCategoryOptions();
+    await loadCategoryOptions(stealingTeam, newWedges);
   };
 
-  // Steal: other team answers wrong — no wedge for anyone
   const handleStealWrong = async () => {
-    setActive(a => 1 - a);
-    await loadCategoryOptions();
+    const nextTeam = 1 - active;
+    setActive(nextTeam);
+    await loadCategoryOptions(nextTeam, wedges);
+  };
+
+  // Final question: opponent picks a category
+  const handleFinalCategoryPick = async (cat) => {
+    setLoading(true); setError(null); setChosenCat(cat); setRevealed(false);
+    setFinalUsedCats(prev => [...prev, cat]); // mark this category as used
+    try {
+      const data = await getQuestion(cat, false);
+      setQuestion(data.question);
+      setState(S.FINAL);
+    } catch (e) { setError(e.message); }
+    finally { setLoading(false); }
   };
 
   // ── WINNER ────────────────────────────────────────────────────────────────
@@ -578,10 +596,53 @@ export default function Game() {
 
       {error && (
         <div style={{ color:'#f87171', fontFamily:'monospace', fontSize:12, marginBottom:10, textAlign:'center' }}>
-          ⚠ {error} <button onClick={loadCategoryOptions} style={{ marginLeft:8, color:'#888', background:'none', border:'none', cursor:'pointer', fontFamily:'monospace', fontSize:11 }}>retry</button>
+          ⚠ {error} <button onClick={() => loadCategoryOptions(active, wedges)} style={{ marginLeft:8, color:'#888', background:'none', border:'none', cursor:'pointer', fontFamily:'monospace', fontSize:11 }}>retry</button>
         </div>
       )}
       {loading && <div style={{ color:'#333', fontFamily:'monospace', fontSize:11, marginBottom:10 }}>Loading...</div>}
+
+      {/* ── FINAL PICK — opponent chooses category for final question ── */}
+      {state === S.FINAL_PICK && finalTeam !== null && (
+        <div style={{ width:'100%', maxWidth:540 }}>
+          <div style={{ textAlign:'center', marginBottom:20, padding:'16px', background:'#fbbf2410', border:'1px solid #fbbf2444', borderRadius:10 }}>
+            <div style={{ fontSize:32, marginBottom:8 }}>🏆</div>
+            <div style={{ color:'#fbbf24', fontSize:18, fontWeight:700, marginBottom:6 }}>
+              {TEAMS[finalTeam].emoji} {TEAMS[finalTeam].label} HAS ALL 6 WEDGES!
+            </div>
+            <div style={{ color:'#888', fontSize:13, fontFamily:'monospace' }}>
+              {TEAMS[1-finalTeam].label.toUpperCase()} — PICK THE FINAL QUESTION CATEGORY
+            </div>
+            {finalUsedCats.length > 0 && (
+              <div style={{ color:'#555', fontSize:11, fontFamily:'monospace', marginTop:6 }}>
+                Already used: {finalUsedCats.join(', ')}
+              </div>
+            )}
+          </div>
+          <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+            {CATEGORIES.map(cat => {
+              const alreadyUsed = finalUsedCats.includes(cat);
+              return (
+                <button key={cat} onClick={() => !alreadyUsed && handleFinalCategoryPick(cat)}
+                  disabled={loading || alreadyUsed} style={{
+                  padding:'20px 24px', borderRadius:12,
+                  border:`2px solid ${alreadyUsed ? '#222' : CAT_COLORS[cat]+'55'}`,
+                  background: alreadyUsed ? '#0d0d0d' : `${CAT_COLORS[cat]}10`,
+                  color: alreadyUsed ? '#333' : '#fff',
+                  cursor: alreadyUsed ? 'not-allowed' : 'pointer',
+                  textAlign:'left', display:'flex', alignItems:'center', gap:16,
+                  opacity: alreadyUsed ? 0.4 : 1,
+                }}>
+                  <span style={{ fontSize:36 }}>{CAT_EMOJI[cat]}</span>
+                  <div>
+                    <div style={{ fontSize:20, fontWeight:700, color: alreadyUsed ? '#333' : CAT_COLORS[cat] }}>{cat}</div>
+                    {alreadyUsed && <div style={{ fontSize:11, color:'#444', fontFamily:'monospace', marginTop:2 }}>already used</div>}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* ── CHOOSING ── */}
       {state === S.CHOOSING && !loading && (
@@ -618,8 +679,8 @@ export default function Game() {
         </div>
       )}
 
-      {/* ── QUESTION / PIE QUESTION ── */}
-      {(state === S.QUESTION || state === S.PIE) && question && (
+      {/* ── QUESTION / PIE QUESTION / FINAL QUESTION ── */}
+      {(state === S.QUESTION || state === S.PIE || state === S.FINAL) && question && (
         <div style={{
           width:'100%', maxWidth:540,
           background: flash==='correct' ? '#0a1a0a' : flash==='wrong' ? '#1a0a0a' : isPieState ? '#100e08' : '#111',
@@ -629,8 +690,8 @@ export default function Game() {
           transition:'background 0.3s',
         }}>
           <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:12 }}>
-            <div style={{ fontSize:9, color:isPieState?'#fbbf24':catData?.color, fontFamily:'monospace', letterSpacing:2, textTransform:'uppercase' }}>
-              {isPieState ? '🥧 PIE QUESTION' : `${catData?.emoji} ${chosenCat}`}
+            <div style={{ fontSize:9, color: state===S.FINAL ? '#fbbf24' : isPieState?'#fbbf24':catData?.color, fontFamily:'monospace', letterSpacing:2, textTransform:'uppercase' }}>
+              {state===S.FINAL ? '🏆 FINAL QUESTION' : isPieState ? '🥧 PIE QUESTION' : `${catData?.emoji} ${chosenCat}`}
             </div>
             <div style={{ display:'flex', gap:8, alignItems:'center' }}>
               {question.canadian && <div style={{ fontSize:8, color:'#cc000099', fontFamily:'monospace' }}>🍁</div>}
@@ -665,12 +726,26 @@ export default function Game() {
                   ⚠ OTHER TEAM — DECLARE STEAL NOW BEFORE REVEALING
                 </div>
               )}
+              {state === S.FINAL && (
+                <div style={{ textAlign:'center', padding:'10px 14px', borderRadius:7, background:'#fbbf2408', border:'1px solid #fbbf2422', color:'#fbbf24', fontSize:13, fontFamily:'monospace', letterSpacing:1 }}>
+                  🏆 {TEAMS[active].label.toUpperCase()} — ANSWER TO WIN THE GAME!
+                </div>
+              )}
               <button onClick={() => setRevealed(true)} style={{
                 width:'100%', padding:'14px', borderRadius:7, cursor:'pointer', fontSize:15, fontFamily:'monospace', letterSpacing:2,
-                border:`1px solid ${isPieState?'#fbbf2433':catData?.color+'33'}`,
-                background:isPieState?'#fbbf2408':`${catData?.color}08`,
-                color:isPieState?'#fbbf24':catData?.color,
+                border:`1px solid ${(isPieState||state===S.FINAL)?'#fbbf2433':catData?.color+'33'}`,
+                background:(isPieState||state===S.FINAL)?'#fbbf2408':`${catData?.color}08`,
+                color:(isPieState||state===S.FINAL)?'#fbbf24':catData?.color,
               }}>REVEAL ANSWER</button>
+            </div>
+          ) : state === S.FINAL ? (
+            <div style={{ display:'flex', gap:8 }}>
+              <button onClick={handleCorrect} disabled={loading} style={{ flex:1, padding:'14px', borderRadius:7, cursor:'pointer', fontSize:15, fontFamily:'monospace', border:'1px solid #14532d', background:'rgba(34,197,94,0.07)', color:'#4ade80' }}>
+                ✓ CORRECT · WIN THE GAME 🏆
+              </button>
+              <button onClick={handleWrong} disabled={loading} style={{ flex:1, padding:'14px', borderRadius:7, cursor:'pointer', fontSize:15, fontFamily:'monospace', border:'1px solid #7f1d1d', background:'rgba(239,68,68,0.07)', color:'#f87171' }}>
+                ✗ WRONG · GAME CONTINUES
+              </button>
             </div>
           ) : isPieState ? (
             <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
