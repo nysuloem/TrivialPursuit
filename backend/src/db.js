@@ -21,7 +21,7 @@ async function initDB() {
     await client.query(`
       CREATE TABLE IF NOT EXISTS questions (
         id            SERIAL PRIMARY KEY,
-        category      TEXT NOT NULL CHECK (category = ANY($1::text[])),
+        category      TEXT NOT NULL,
         question      TEXT NOT NULL,
         answer        TEXT NOT NULL,
         is_pie        BOOLEAN DEFAULT FALSE,
@@ -29,27 +29,28 @@ async function initDB() {
         used          BOOLEAN DEFAULT FALSE,
         used_at       TIMESTAMPTZ,
         created_at    TIMESTAMPTZ DEFAULT NOW()
-      );
-
+      )
+    `);
+    await client.query(`
       CREATE TABLE IF NOT EXISTS admins (
         id            SERIAL PRIMARY KEY,
         username      TEXT UNIQUE NOT NULL,
         password_hash TEXT NOT NULL,
         created_at    TIMESTAMPTZ DEFAULT NOW()
-      );
-
+      )
+    `);
+    await client.query(`
       CREATE TABLE IF NOT EXISTS refill_log (
-        id            SERIAL PRIMARY KEY,
-        triggered_at  TIMESTAMPTZ DEFAULT NOW(),
-        questions_added INT,
+        id                SERIAL PRIMARY KEY,
+        triggered_at      TIMESTAMPTZ DEFAULT NOW(),
+        questions_added   INT,
         bank_count_before INT,
-        status        TEXT DEFAULT 'pending'
-      );
-
-      CREATE INDEX IF NOT EXISTS idx_q_cat_used  ON questions(category, used);
-      CREATE INDEX IF NOT EXISTS idx_q_used       ON questions(used);
-      CREATE INDEX IF NOT EXISTS idx_q_pie        ON questions(is_pie, used);
-    `, [CATEGORIES]);
+        status            TEXT DEFAULT 'pending'
+      )
+    `);
+    await client.query(`CREATE INDEX IF NOT EXISTS idx_q_cat_used ON questions(category, used)`);
+    await client.query(`CREATE INDEX IF NOT EXISTS idx_q_used ON questions(used)`);
+    await client.query(`CREATE INDEX IF NOT EXISTS idx_q_pie ON questions(is_pie, used)`);
 
     console.log('✅ DB schema ready');
   } finally {
