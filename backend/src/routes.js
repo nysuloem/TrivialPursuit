@@ -9,11 +9,13 @@ router.post('/auth/login', login);
 
 // ── Game API ──────────────────────────────────────────────────────────────────
 
-// GET /api/game/categories — returns 2 random category options for a turn
-router.get('/game/categories', async (req, res) => {
+// POST /api/game/categories — returns 2 random category options, excluding owned wedges
+// Body: { ownedCategories: [...] }
+router.post('/game/categories', async (req, res) => {
   try {
-    const cats = await db.getTwoCategoryOptions();
-    if (cats.length < 2) {
+    const { ownedCategories = [] } = req.body;
+    const cats = await db.getTwoCategoryOptions(ownedCategories);
+    if (cats.length < 1) {
       return res.status(503).json({ error: 'Not enough questions in bank', bankEmpty: true });
     }
     res.json({ categories: cats });
@@ -21,6 +23,11 @@ router.get('/game/categories', async (req, res) => {
     console.error(err);
     res.status(500).json({ error: 'Server error' });
   }
+});
+
+// GET /api/game/all-categories — returns all categories (for final question opponent pick)
+router.get('/game/all-categories', async (req, res) => {
+  res.json({ categories: db.CATEGORIES });
 });
 
 // POST /api/game/question — get a question for chosen category
