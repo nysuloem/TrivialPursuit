@@ -514,33 +514,48 @@ export default function Game() {
       )}
 
       {/* Header */}
-      <div style={{ textAlign:'center', marginBottom:12 }}>
-        <div style={{ fontSize:9, letterSpacing:7, color:'#cc0000', fontFamily:'monospace', marginBottom:2 }}>🍁 CANADA 🍁</div>
-        <h1 style={{ fontSize:'clamp(18px,4vw,30px)', color:'#fff', margin:0, fontWeight:900, letterSpacing:-1 }}>TRIVIAL PURSUIT</h1>
-        {bankCount !== null && (
-          <div style={{ fontSize:9, color: bankCount < 250 ? '#ef4444' : '#2a2a2a', fontFamily:'monospace', marginTop:3 }}>
-            {bankCount} questions in bank{bankCount < 250 ? ' ⚠️ REFILLING...' : ''}
+      <div style={{ textAlign:'center', marginBottom:16 }}>
+        <h1 style={{ fontSize:'clamp(28px,6vw,48px)', color:'#fff', margin:0, fontWeight:900, letterSpacing:-1 }}>TRIVIAL PURSUIT</h1>
+        {bankCount !== null && bankCount < 250 && (
+          <div style={{ fontSize:10, color:'#ef4444', fontFamily:'monospace', marginTop:3 }}>
+            ⚠️ Refilling question bank...
           </div>
         )}
       </div>
 
       {/* Scoreboards */}
-      <div style={{ display:'flex', width:'100%', maxWidth:540, gap:8, marginBottom:12 }}>
+      <div style={{ display:'flex', width:'100%', maxWidth:600, gap:10, marginBottom:16 }}>
         {TEAMS.map((t, i) => (
           <div key={i} style={{
-            flex:1, background:'#111', borderRadius:10, padding:'10px 8px',
+            flex:1, background:'#111', borderRadius:12, padding:'14px 10px',
             border:`1px solid ${active===i ? t.color+'55' : '#1c1c1c'}`,
-            borderBottom:`3px solid ${active===i ? t.color : '#1c1c1c'}`,
-            display:'flex', flexDirection:'column', alignItems:'center', gap:4,
+            borderBottom:`4px solid ${active===i ? t.color : '#1c1c1c'}`,
+            display:'flex', flexDirection:'column', alignItems:'center', gap:6,
           }}>
-            <div style={{ fontSize:11, color:active===i?'#fff':'#333', fontFamily:'monospace' }}>{t.emoji} {t.label.toUpperCase()}</div>
-            <div style={{ fontSize:22, fontWeight:900, color:active===i?t.color:'#2a2a2a', fontFamily:'monospace' }}>{scores[i]}</div>
-            <PieDisplay wedges={wedges[i]} size={88} />
-            <div style={{ fontSize:9, color:'#2a2a2a', fontFamily:'monospace' }}>{wedges[i].length}/{CATEGORIES.length} wedges</div>
-            {active===i && currentStreak.n > 0 && (
-              <div style={{ fontSize:9, color:t.color, fontFamily:'monospace' }}>🔥 {currentStreak.n} streak</div>
-            )}
-            {active===i && <div style={{ fontSize:8, color:t.color+'66', fontFamily:'monospace', letterSpacing:1 }}>▸ PLAYING</div>}
+            <div style={{ fontSize:16, color:active===i?'#fff':'#333', fontFamily:'monospace', fontWeight:700 }}>{t.emoji} {t.label.toUpperCase()}</div>
+            <div style={{ fontSize:32, fontWeight:900, color:active===i?t.color:'#2a2a2a', fontFamily:'monospace' }}>{scores[i]}</div>
+            <PieDisplay wedges={wedges[i]} size={100} />
+            <div style={{ fontSize:11, color:'#444', fontFamily:'monospace' }}>{wedges[i].length}/{CATEGORIES.length} wedges</div>
+            {/* Streak tracker for this team */}
+            <div style={{ width:'100%', display:'flex', flexDirection:'column', gap:3, marginTop:2 }}>
+              {CATEGORIES.map(cat => {
+                const owned = wedges[i].includes(cat);
+                const s = streak[i].cat === cat ? streak[i].n : 0;
+                const pieReady = s >= STREAK_NEEDED && !owned;
+                return (
+                  <div key={cat} style={{ display:'flex', alignItems:'center', gap:5, opacity: owned ? 0.4 : 1 }}>
+                    <span style={{ fontSize:10 }}>{CAT_EMOJI[cat]}</span>
+                    <div style={{ flex:1, height:5, background:'#1a1a1a', borderRadius:3, overflow:'hidden' }}>
+                      <div style={{ height:'100%', width: owned ? '100%' : `${(s/STREAK_NEEDED)*100}%`, background: owned ? '#444' : pieReady ? '#fbbf24' : t.color, borderRadius:3, transition:'width 0.3s' }} />
+                    </div>
+                    {owned && <span style={{ fontSize:9, color:'#444' }}>✓</span>}
+                    {pieReady && <span style={{ fontSize:9, color:'#fbbf24' }}>🥧</span>}
+                    {!owned && s > 0 && !pieReady && <span style={{ fontSize:9, color:t.color }}>{s}/{STREAK_NEEDED}</span>}
+                  </div>
+                );
+              })}
+            </div>
+            {active===i && <div style={{ fontSize:10, color:t.color+'88', fontFamily:'monospace', letterSpacing:1, marginTop:2 }}>▸ PLAYING</div>}
           </div>
         ))}
       </div>
@@ -560,24 +575,24 @@ export default function Game() {
               {TEAMS[active].emoji} {TEAMS[active].label.toUpperCase()} — CHOOSE A CATEGORY
             </div>
           </div>
-          <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+          <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
             {catOptions.filter(Boolean).map(cat => {
               const alreadyOwned = wedges[active].includes(cat);
               const streakInCat  = streak[active].cat === cat ? streak[active].n : 0;
               const pieReady     = streakInCat >= STREAK_NEEDED && !alreadyOwned;
               return (
                 <button key={cat} onClick={() => handlePickCategory(cat)} disabled={loading} style={{
-                  padding:'18px 20px', borderRadius:10,
+                  padding:'22px 24px', borderRadius:12,
                   border:`2px solid ${pieReady ? '#fbbf24' : CAT_COLORS[cat]+'55'}`,
                   background: pieReady ? '#fbbf2410' : `${CAT_COLORS[cat]}10`,
                   color:'#fff', cursor:'pointer', textAlign:'left',
-                  display:'flex', alignItems:'center', gap:14,
+                  display:'flex', alignItems:'center', gap:16,
                 }}>
-                  <span style={{ fontSize:28 }}>{CAT_EMOJI[cat]}</span>
+                  <span style={{ fontSize:36 }}>{CAT_EMOJI[cat]}</span>
                   <div>
-                    <div style={{ fontSize:15, fontWeight:700, color: pieReady ? '#fbbf24' : CAT_COLORS[cat] }}>{cat}</div>
-                    <div style={{ fontSize:10, color:'#555', fontFamily:'monospace', marginTop:2 }}>
-                      {alreadyOwned ? '✓ wedge owned' : pieReady ? '🥧 PIE QUESTION READY!' : streakInCat > 0 ? `🔥 ${streakInCat}/${STREAK_NEEDED} streak` : 'tap to play'}
+                    <div style={{ fontSize:20, fontWeight:700, color: pieReady ? '#fbbf24' : CAT_COLORS[cat] }}>{cat}</div>
+                    <div style={{ fontSize:13, color:'#555', fontFamily:'monospace', marginTop:4 }}>
+                      {alreadyOwned ? '✓ wedge owned' : pieReady ? '🥧 PIE QUESTION READY!' : streakInCat > 0 ? `🔥 ${streakInCat}/${STREAK_NEEDED} — one more for pie!` : 'tap to play'}
                     </div>
                   </div>
                 </button>
@@ -611,35 +626,35 @@ export default function Game() {
             </div>
           </div>
 
-          <div style={{ fontSize:'clamp(13px,2.4vw,16px)', color:isPieState?'#fffbeb':'#ddd', lineHeight:1.7, marginBottom:14, minHeight:44 }}>
+          <div style={{ fontSize:'clamp(18px,3vw,24px)', color:isPieState?'#fffbeb':'#ddd', lineHeight:1.7, marginBottom:18, minHeight:60 }}>
             {question.question}
           </div>
 
           <div onClick={() => !revealed && setRevealed(true)} style={{
-            borderRadius:7, padding:'11px 14px', marginBottom:12, minHeight:40,
+            borderRadius:7, padding:'16px 18px', marginBottom:14, minHeight:52,
             background:revealed?'#161616':'#090909',
             border:`1px solid ${revealed?(isPieState?'#fbbf2433':catData?.color+'2a'):'#161616'}`,
             cursor:revealed?'default':'pointer', transition:'all 0.2s',
           }}>
             {revealed
-              ? <div style={{ color:'#fff', fontSize:14, fontWeight:600, lineHeight:1.55 }}>{question.answer}</div>
-              : <div style={{ color:'#1c1c1c', fontSize:10, fontFamily:'monospace', letterSpacing:3 }}>▸ TAP TO REVEAL</div>
+              ? <div style={{ color:'#fff', fontSize:20, fontWeight:600, lineHeight:1.55 }}>{question.answer}</div>
+              : <div style={{ color:'#1c1c1c', fontSize:12, fontFamily:'monospace', letterSpacing:3 }}>▸ TAP TO REVEAL ANSWER</div>
             }
           </div>
 
           {!revealed ? (
             <button onClick={() => setRevealed(true)} style={{
-              width:'100%', padding:'10px', borderRadius:7, cursor:'pointer', fontSize:11, fontFamily:'monospace', letterSpacing:2,
+              width:'100%', padding:'14px', borderRadius:7, cursor:'pointer', fontSize:15, fontFamily:'monospace', letterSpacing:2,
               border:`1px solid ${isPieState?'#fbbf2433':catData?.color+'33'}`,
               background:isPieState?'#fbbf2408':`${catData?.color}08`,
               color:isPieState?'#fbbf24':catData?.color,
             }}>REVEAL ANSWER</button>
           ) : (
-            <div style={{ display:'flex', gap:7 }}>
-              <button onClick={handleCorrect} disabled={loading} style={{ flex:1, padding:'10px', borderRadius:7, cursor:'pointer', fontSize:11, fontFamily:'monospace', border:'1px solid #14532d', background:'rgba(34,197,94,0.07)', color:'#4ade80' }}>
+            <div style={{ display:'flex', gap:8 }}>
+              <button onClick={handleCorrect} disabled={loading} style={{ flex:1, padding:'14px', borderRadius:7, cursor:'pointer', fontSize:15, fontFamily:'monospace', border:'1px solid #14532d', background:'rgba(34,197,94,0.07)', color:'#4ade80' }}>
                 ✓ CORRECT{isPieState?' · WIN WEDGE':' · KEEP GOING'}
               </button>
-              <button onClick={handleWrong} disabled={loading} style={{ flex:1, padding:'10px', borderRadius:7, cursor:'pointer', fontSize:11, fontFamily:'monospace', border:'1px solid #7f1d1d', background:'rgba(239,68,68,0.07)', color:'#f87171' }}>
+              <button onClick={handleWrong} disabled={loading} style={{ flex:1, padding:'14px', borderRadius:7, cursor:'pointer', fontSize:15, fontFamily:'monospace', border:'1px solid #7f1d1d', background:'rgba(239,68,68,0.07)', color:'#f87171' }}>
                 {isPieState ? '✗ WRONG · STEAL?' : '✗ WRONG · SWITCH'}
               </button>
             </div>
