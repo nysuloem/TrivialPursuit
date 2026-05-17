@@ -296,7 +296,8 @@ export default function Game() {
   const [active,     setActive]     = useState(0);
   const [scores,     setScores]     = useState([0, 0]);
   const [wedges,     setWedges]     = useState([[], []]);
-  const [streak,     setStreak]     = useState([{ cat: null, n: 0 }, { cat: null, n: 0 }]);
+  // streak is now per-team per-category: [{ Geography: 1, History: 2, ... }, { ... }]
+  const [streak,     setStreak]     = useState([{}, {}]);
   const [catOptions, setCatOptions] = useState([]);
   const [chosenCat,  setChosenCat]  = useState(null);
   const [question,   setQuestion]   = useState(null);
@@ -340,18 +341,16 @@ export default function Game() {
   const handlePickCategory = async (cat) => {
     getAudio(); // unlock audio context on user tap
     setLoading(true); setError(null); setChosenCat(cat);
+    setRevealed(false); // always reset revealed when picking new category
     try {
-      const isPieTurn =
-        streak[active].cat === cat &&
-        streak[active].n >= STREAK_NEEDED &&
-        !wedges[active].includes(cat);
+      const catStreak = streak[active][cat] || 0;
+      const isPieTurn = catStreak >= STREAK_NEEDED && !wedges[active].includes(cat);
 
       const data = await getQuestion(cat, isPieTurn);
       setQuestion(data.question);
-      setRevealed(false);
+      setRevealed(false); // double-reset to be safe
 
       if (isPieTurn) {
-        // Show animated intro first
         playPieSting(getAudio());
         setState(S.PIE_INTRO);
       } else {
@@ -361,8 +360,9 @@ export default function Game() {
     finally { setLoading(false); }
   };
 
-  // Called when pie intro animation finishes
+  // Called when pie intro animation finishes — ensure revealed is false
   const handlePieIntroDone = useCallback(() => {
+    setRevealed(false);
     setState(S.PIE);
   }, []);
 
@@ -389,25 +389,32 @@ export default function Game() {
       if (newWedges[active].length === CATEGORIES.length) {
         setWinner(active); setState(S.WINNER); return;
       }
-      setStreak(prev => { const n=[...prev]; n[active]={cat:null,n:0}; return n; });
+      // Reset streak for this category only
+      setStreak(prev => {
+        const n = [...prev];
+        n[active] = { ...n[active], [chosenCat]: 0 };
+        return n;
+      });
       await loadCategoryOptions();
       return;
     }
 
-    // Regular question — update streak
-    const prev = streak[active];
-    const newN = prev.cat === chosenCat ? prev.n + 1 : 1;
-    const newStreak = [...streak];
-    newStreak[active] = { cat: chosenCat, n: newN };
-    setStreak(newStreak);
+    // Regular question — increment streak for THIS category only
+    // Other category streaks are preserved
+    const catStreak = (streak[active][chosenCat] || 0) + 1;
+    setStreak(prev => {
+      const n = [...prev];
+      n[active] = { ...n[active], [chosenCat]: catStreak };
+      return n;
+    });
 
-    if (newN >= STREAK_NEEDED && !wedges[active].includes(chosenCat)) {
+    if (catStreak >= STREAK_NEEDED && !wedges[active].includes(chosenCat)) {
       // Pie unlocked — fetch pie question then show intro
       setLoading(true);
       try {
         const data = await getQuestion(chosenCat, true);
         setQuestion(data.question);
-        setStreak(prev => { const n=[...prev]; n[active]={cat:null,n:0}; return n; });
+        setRevealed(false);
         playPieSting(getAudio());
         setState(S.PIE_INTRO);
       } catch (e) { setError(e.message); }
@@ -420,10 +427,14 @@ export default function Game() {
   const handleWrong = async () => {
     await consumeQuestion();
     triggerFlash('wrong');
-    setStreak(prev => { const n=[...prev]; n[active]={cat:null,n:0}; return n; });
+    // Only reset streak for the category they got wrong
+    setStreak(prev => {
+      const n = [...prev];
+      n[active] = { ...n[active], [chosenCat]: 0 };
+      return n;
+    });
 
     if (state === S.PIE) {
-      // Trigger steal for other team
       playStealSting(getAudio());
       setState(S.STEAL);
       return;
@@ -435,7 +446,7 @@ export default function Game() {
 
   const handleSkip = async () => {
     await consumeQuestion();
-    setStreak(prev => { const n=[...prev]; n[active]={cat:null,n:0}; return n; });
+    // Skip doesn't affect streak
     await loadCategoryOptions();
   };
 
@@ -454,7 +465,12 @@ export default function Game() {
       setWinner(stealingTeam); setState(S.WINNER); return;
     }
 
-    // Stealing team gets a bonus turn
+    // Stealing team gets a bonus turn, reset their streak for this cat
+    setStreak(prev => {
+      const n = [...prev];
+      n[stealingTeam] = { ...n[stealingTeam], [chosenCat]: 0 };
+      return n;
+    });
     setActive(stealingTeam);
     await loadCategoryOptions();
   };
@@ -516,9 +532,9 @@ export default function Game() {
       {/* Header */}
       <div style={{ textAlign:'center', marginBottom:16 }}>
         <h1 style={{ fontSize:'clamp(28px,6vw,48px)', color:'#fff', margin:0, fontWeight:900, letterSpacing:-1 }}>TRIVIAL PURSUIT</h1>
-        {bankCount !== null && bankCount < 250 && (
-          <div style={{ fontSize:10, color:'#ef4444', fontFamily:'monospace', marginTop:3 }}>
-            ⚠️ Refilling question bank...
+        {bankCount !== null && (
+          <div style={{ fontSize:12, color: bankCount < 100 ? '#ef4444' : '#555', fontFamily:'monospace', marginTop:4 }}>
+            {bankCount} questions in bank{bankCount < 250 ? ' · refilling...' : ''}
           </div>
         )}
       </div>
@@ -536,21 +552,21 @@ export default function Game() {
             <div style={{ fontSize:32, fontWeight:900, color:active===i?t.color:'#2a2a2a', fontFamily:'monospace' }}>{scores[i]}</div>
             <PieDisplay wedges={wedges[i]} size={100} />
             <div style={{ fontSize:11, color:'#444', fontFamily:'monospace' }}>{wedges[i].length}/{CATEGORIES.length} wedges</div>
-            {/* Streak tracker for this team */}
-            <div style={{ width:'100%', display:'flex', flexDirection:'column', gap:3, marginTop:2 }}>
+            {/* Per-category streak tracker */}
+            <div style={{ width:'100%', display:'flex', flexDirection:'column', gap:4, marginTop:2 }}>
               {CATEGORIES.map(cat => {
                 const owned = wedges[i].includes(cat);
-                const s = streak[i].cat === cat ? streak[i].n : 0;
+                const s = streak[i][cat] || 0;
                 const pieReady = s >= STREAK_NEEDED && !owned;
                 return (
-                  <div key={cat} style={{ display:'flex', alignItems:'center', gap:5, opacity: owned ? 0.4 : 1 }}>
-                    <span style={{ fontSize:10 }}>{CAT_EMOJI[cat]}</span>
-                    <div style={{ flex:1, height:5, background:'#1a1a1a', borderRadius:3, overflow:'hidden' }}>
-                      <div style={{ height:'100%', width: owned ? '100%' : `${(s/STREAK_NEEDED)*100}%`, background: owned ? '#444' : pieReady ? '#fbbf24' : t.color, borderRadius:3, transition:'width 0.3s' }} />
+                  <div key={cat} style={{ display:'flex', alignItems:'center', gap:6, opacity: owned ? 0.35 : 1 }}>
+                    <span style={{ fontSize:16, minWidth:22 }}>{CAT_EMOJI[cat]}</span>
+                    <div style={{ flex:1, height:6, background:'#1a1a1a', borderRadius:3, overflow:'hidden' }}>
+                      <div style={{ height:'100%', width: owned ? '100%' : `${Math.min((s/STREAK_NEEDED)*100,100)}%`, background: owned ? '#333' : pieReady ? '#fbbf24' : t.color, borderRadius:3, transition:'width 0.4s' }} />
                     </div>
-                    {owned && <span style={{ fontSize:9, color:'#444' }}>✓</span>}
-                    {pieReady && <span style={{ fontSize:9, color:'#fbbf24' }}>🥧</span>}
-                    {!owned && s > 0 && !pieReady && <span style={{ fontSize:9, color:t.color }}>{s}/{STREAK_NEEDED}</span>}
+                    {owned && <span style={{ fontSize:11, color:'#444' }}>✓</span>}
+                    {pieReady && !owned && <span style={{ fontSize:13 }}>🥧</span>}
+                    {!owned && s > 0 && !pieReady && <span style={{ fontSize:10, color:t.color, fontFamily:'monospace', minWidth:24 }}>{s}/{STREAK_NEEDED}</span>}
                   </div>
                 );
               })}
@@ -578,7 +594,7 @@ export default function Game() {
           <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
             {catOptions.filter(Boolean).map(cat => {
               const alreadyOwned = wedges[active].includes(cat);
-              const streakInCat  = streak[active].cat === cat ? streak[active].n : 0;
+              const streakInCat  = streak[active][cat] || 0;
               const pieReady     = streakInCat >= STREAK_NEEDED && !alreadyOwned;
               return (
                 <button key={cat} onClick={() => handlePickCategory(cat)} disabled={loading} style={{
@@ -643,19 +659,47 @@ export default function Game() {
           </div>
 
           {!revealed ? (
-            <button onClick={() => setRevealed(true)} style={{
-              width:'100%', padding:'14px', borderRadius:7, cursor:'pointer', fontSize:15, fontFamily:'monospace', letterSpacing:2,
-              border:`1px solid ${isPieState?'#fbbf2433':catData?.color+'33'}`,
-              background:isPieState?'#fbbf2408':`${catData?.color}08`,
-              color:isPieState?'#fbbf24':catData?.color,
-            }}>REVEAL ANSWER</button>
+            <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+              {isPieState && (
+                <div style={{ textAlign:'center', padding:'10px 14px', borderRadius:7, background:'#fbbf2408', border:'1px solid #fbbf2422', color:'#fbbf24', fontSize:13, fontFamily:'monospace', letterSpacing:1 }}>
+                  ⚠ OTHER TEAM — DECLARE STEAL NOW BEFORE REVEALING
+                </div>
+              )}
+              <button onClick={() => setRevealed(true)} style={{
+                width:'100%', padding:'14px', borderRadius:7, cursor:'pointer', fontSize:15, fontFamily:'monospace', letterSpacing:2,
+                border:`1px solid ${isPieState?'#fbbf2433':catData?.color+'33'}`,
+                background:isPieState?'#fbbf2408':`${catData?.color}08`,
+                color:isPieState?'#fbbf24':catData?.color,
+              }}>REVEAL ANSWER</button>
+            </div>
+          ) : isPieState ? (
+            <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+              <button onClick={handleCorrect} disabled={loading} style={{
+                width:'100%', padding:'14px', borderRadius:7, cursor:'pointer', fontSize:15, fontFamily:'monospace',
+                border:'1px solid #14532d', background:'rgba(34,197,94,0.07)', color:'#4ade80',
+              }}>✓ {TEAMS[active].label.toUpperCase()} GOT IT · WIN WEDGE</button>
+              <button onClick={handleStealCorrect} disabled={loading} style={{
+                width:'100%', padding:'14px', borderRadius:7, cursor:'pointer', fontSize:15, fontFamily:'monospace',
+                border:'1px solid #1d4ed8', background:'rgba(59,130,246,0.07)', color:'#60a5fa',
+              }}>✓ STEAL CORRECT · {TEAMS[1-active].label.toUpperCase()} WIN WEDGE + BONUS</button>
+              <button onClick={async () => {
+                await consumeQuestion();
+                triggerFlash('wrong');
+                setStreak(prev => { const n=[...prev]; n[active]={...n[active],[chosenCat]:0}; return n; });
+                setActive(a => 1 - a);
+                await loadCategoryOptions();
+              }} disabled={loading} style={{
+                width:'100%', padding:'14px', borderRadius:7, cursor:'pointer', fontSize:15, fontFamily:'monospace',
+                border:'1px solid #7f1d1d', background:'rgba(239,68,68,0.07)', color:'#f87171',
+              }}>✗ BOTH WRONG · NO WEDGE · SWITCH</button>
+            </div>
           ) : (
             <div style={{ display:'flex', gap:8 }}>
               <button onClick={handleCorrect} disabled={loading} style={{ flex:1, padding:'14px', borderRadius:7, cursor:'pointer', fontSize:15, fontFamily:'monospace', border:'1px solid #14532d', background:'rgba(34,197,94,0.07)', color:'#4ade80' }}>
-                ✓ CORRECT{isPieState?' · WIN WEDGE':' · KEEP GOING'}
+                ✓ CORRECT · KEEP GOING
               </button>
               <button onClick={handleWrong} disabled={loading} style={{ flex:1, padding:'14px', borderRadius:7, cursor:'pointer', fontSize:15, fontFamily:'monospace', border:'1px solid #7f1d1d', background:'rgba(239,68,68,0.07)', color:'#f87171' }}>
-                {isPieState ? '✗ WRONG · STEAL?' : '✗ WRONG · SWITCH'}
+                ✗ WRONG · SWITCH
               </button>
             </div>
           )}
