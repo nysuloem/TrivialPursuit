@@ -52,6 +52,20 @@ async function initDB() {
     await client.query(`CREATE INDEX IF NOT EXISTS idx_q_used ON questions(used)`);
     await client.query(`CREATE INDEX IF NOT EXISTS idx_q_pie ON questions(is_pie, used)`);
 
+    // Unique constraint to prevent duplicate questions
+    await client.query(`
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_q_unique_question 
+      ON questions(LOWER(question))
+    `);
+
+    // Clean up any existing duplicates (keep lowest id)
+    await client.query(`
+      DELETE FROM questions
+      WHERE id NOT IN (
+        SELECT MIN(id) FROM questions GROUP BY LOWER(question)
+      )
+    `);
+
     console.log('✅ DB schema ready');
   } finally {
     client.release();
@@ -62,6 +76,18 @@ async function initDB() {
 async function getUnusedCount() {
   const r = await pool.query('SELECT COUNT(*) FROM questions WHERE used = FALSE');
   return parseInt(r.rows[0].count);
+}
+
+// Returns categories that have fewer than MIN_PER_CATEGORY unused questions
+const MIN_PER_CATEGORY = 50;
+async function getLowCategories() {
+  const r = await pool.query(`
+    SELECT category, COUNT(*) FILTER (WHERE used = FALSE) as available
+    FROM questions
+    GROUP BY category
+    HAVING COUNT(*) FILTER (WHERE used = FALSE) < $1
+  `, [MIN_PER_CATEGORY]);
+  return r.rows; // [{ category, available }]
 }
 
 async function getBankStats() {
@@ -182,18 +208,22 @@ async function listQuestions({ page = 1, limit = 50, category, used, search, isP
 }
 
 async function insertQuestions(questions) {
-  if (!questions.length) return;
+  if (!questions.length) return 0;
   const client = await pool.connect();
+  let inserted = 0;
   try {
     await client.query('BEGIN');
     for (const q of questions) {
-      await client.query(
+      const r = await client.query(
         `INSERT INTO questions (category, question, answer, is_pie, canadian)
-         VALUES ($1, $2, $3, $4, $5)`,
+         VALUES ($1, $2, $3, $4, $5)
+         ON CONFLICT (LOWER(question)) DO NOTHING`,
         [q.category, q.question, q.answer, q.is_pie || false, q.canadian || false]
       );
+      inserted += r.rowCount;
     }
     await client.query('COMMIT');
+    return inserted;
   } catch (e) {
     await client.query('ROLLBACK');
     throw e;
@@ -228,7 +258,7 @@ async function getRefillLog() {
 
 module.exports = {
   pool, initDB, CATEGORIES,
-  getUnusedCount, getBankStats,
+  getUnusedCount, getBankStats, getLowCategories,
   getTwoCategoryOptions, getQuestion, markUsed, hasPieQuestion,
   getAdminByUsername, createAdmin,
   listQuestions, insertQuestions, deleteQuestion, updateQuestion,
