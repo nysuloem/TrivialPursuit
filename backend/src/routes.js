@@ -32,7 +32,18 @@ router.post('/tts', async (req, res) => {
       speed: 0.95,
     });
 
-    const buffer = Buffer.from(await mp3.arrayBuffer());
+    // Get audio as buffer - handle both response formats
+    let buffer;
+    if (typeof mp3.arrayBuffer === 'function') {
+      buffer = Buffer.from(await mp3.arrayBuffer());
+    } else if (mp3.body) {
+      const chunks = [];
+      for await (const chunk of mp3.body) chunks.push(chunk);
+      buffer = Buffer.concat(chunks);
+    } else {
+      buffer = Buffer.from(await mp3.blob().then(b => b.arrayBuffer()));
+    }
+
     res.set({
       'Content-Type':   'audio/mpeg',
       'Content-Length': buffer.length,
@@ -40,7 +51,7 @@ router.post('/tts', async (req, res) => {
     });
     res.send(buffer);
   } catch (err) {
-    console.error('TTS error:', err.message);
+    console.error('TTS error:', err.message, err.stack);
     res.status(500).json({ error: 'TTS failed: ' + err.message });
   }
 });
