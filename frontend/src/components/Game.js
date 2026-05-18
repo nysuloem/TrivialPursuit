@@ -110,7 +110,7 @@ const S = {
 };
 
 // ─── DICE ROLLING COMPONENT ───────────────────────────────────────────────
-function DiceRollStart({ onRollComplete, getAudio }) {
+function DiceRollStart({ onRollComplete, getAudio, audioCtxRef }) {
   const [rolls, setRolls] = useState([null, null]);
   const [rolling, setRolling] = useState([false, false]);
   const [tieMessage, setTieMessage] = useState(false);
@@ -131,7 +131,9 @@ function DiceRollStart({ onRollComplete, getAudio }) {
         next[teamIdx] = Math.floor(Math.random() * 6) + 1;
         return next;
       });
-      playDiceSound(audioCtxRef ? audioCtxRef.current : null); // Fallback handling inside engine
+      if (audioCtxRef && audioCtxRef.current) {
+        playDiceSound(audioCtxRef.current);
+      }
       counter++;
       
       if (counter > 10) {
@@ -150,14 +152,12 @@ function DiceRollStart({ onRollComplete, getAudio }) {
     if (rolling[0] || rolling[1]) return;
     if (rolls[0] !== null && rolls[1] !== null) {
       if (rolls[0] === rolls[1]) {
-        // It's a tie, reset after a brief moment so they can try again
         const tieTimer = setTimeout(() => {
           setTieMessage(true);
           setRolls([null, null]);
         }, 1000);
         return () => clearTimeout(tieTimer);
       } else {
-        // Distinct winner found
         const winnerIdx = rolls[0] > rolls[1] ? 0 : 1;
         const proceedTimer = setTimeout(() => {
           onRollComplete(winnerIdx);
@@ -192,7 +192,6 @@ function DiceRollStart({ onRollComplete, getAudio }) {
             }}>
               <div style={{ fontSize: 12, color: '#fff', fontFamily: 'monospace', marginBottom: 12 }}>{t.emoji} {t.label.toUpperCase()}</div>
               
-              {/* Die Visual Representation */}
               <div style={{
                 width: 64, height: 64, background: rolling[i] ? '#222' : hasRolled ? t.color : '#1a1a1a',
                 color: rolling[i] ? '#555' : hasRolled ? '#fff' : '#333',
@@ -295,258 +294,4 @@ function PieIntro({ category, teamIdx, onDone }) {
 function PieWedge({ color, emoji, size = 160 }) {
   const cx = size / 2, cy = size / 2, r = size / 2 - 8;
   const startAngle = -Math.PI / 2;
-  const endAngle   = startAngle + (Math.PI * 2) / 6;
-  const x1 = cx + r * Math.cos(startAngle);
-  const y1 = cy + r * Math.sin(startAngle);
-  const x2 = cx + r * Math.cos(endAngle);
-  const y2 = cy + r * Math.sin(endAngle);
-  const mid = (startAngle + endAngle) / 2;
-  return (
-    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
-      <defs>
-        <filter id="glow">
-          <feGaussianBlur stdDeviation="6" result="coloredBlur"/>
-          <feMerge><feMergeNode in="coloredBlur"/><feMergeNode in="SourceGraphic"/></feMerge>
-        </filter>
-      </defs>
-      <circle cx={cx} cy={cy} r={r + 6} fill="#111" />
-      <path
-        d={`M ${cx} ${cy} L ${x1} ${y1} A ${r} ${r} 0 0 1 ${x2} ${y2} Z`}
-        fill={color}
-        filter="url(#glow)"
-        stroke="#0a0a0a" strokeWidth="2"
-      />
-      <text x={cx + r * 0.58 * Math.cos(mid)} y={cy + r * 0.58 * Math.sin(mid)}
-        textAnchor="middle" dominantBaseline="middle" fontSize="28">{emoji}</text>
-    </svg>
-  );
-}
-
-// ─── STEAL SCREEN ──────────────────────────────────────────────────────────
-function StealScreen({ stealingTeamIdx, category, question, onCorrect, onWrong }) {
-  const [revealed, setRevealed] = useState(false);
-  const color  = CAT_COLORS[category];
-  const team   = TEAMS[stealingTeamIdx];
-
-  return (
-    <div style={{
-      position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.95)',
-      display: 'flex', flexDirection: 'column', alignItems: 'center',
-      justifyContent: 'center', padding: 20, zIndex: 100, gap: 16,
-    }}>
-      <style>{`
-        @keyframes stealPulse { 0%,100%{transform:scale(1)} 50%{transform:scale(1.04)} }
-      `}</style>
-
-      <div style={{ textAlign: 'center' }}>
-        <div style={{ fontSize: 36, marginBottom: 8 }}>🕵️</div>
-        <div style={{ fontSize: 11, letterSpacing: 6, color: '#f97316', fontFamily: 'monospace', marginBottom: 4 }}>
-          STEAL OPPORTUNITY
-        </div>
-        <div style={{
-          fontSize: 'clamp(20px,4vw,30px)', color: team.color, fontWeight: 900,
-          animation: 'stealPulse 1.2s ease infinite',
-        }}>
-          {team.emoji} {team.label.toUpperCase()}
-        </div>
-        <div style={{ fontSize: 11, color: '#555', fontFamily: 'monospace', marginTop: 4 }}>
-          Answer correctly to steal the wedge + get a bonus turn!
-        </div>
-      </div>
-
-      <div style={{
-        width: '100%', maxWidth: 520,
-        background: '#111',
-        border: `2px solid ${color}55`,
-        borderLeft: `4px solid ${color}`,
-        borderRadius: 10, padding: '18px 16px',
-      }}>
-        <div style={{ fontSize: 9, color: '#f97316', fontFamily: 'monospace', letterSpacing: 2, marginBottom: 12 }}>
-          🥧 {category.toUpperCase()} — SAME QUESTION
-        </div>
-        <div style={{ fontSize: 'clamp(13px,2.4vw,16px)', color: '#fffbeb', lineHeight: 1.7, marginBottom: 14 }}>
-          {question.question}
-        </div>
-
-        <div onClick={() => !revealed && setRevealed(true)} style={{
-          borderRadius: 7, padding: '11px 14px', marginBottom: 12, minHeight: 40,
-          background: revealed ? '#161616' : '#090909',
-          border: `1px solid ${revealed ? color + '33' : '#161616'}`,
-          cursor: revealed ? 'default' : 'pointer',
-        }}>
-          {revealed
-            ? <div style={{ color: '#fff', fontSize: 14, fontWeight: 600 }}>{question.answer}</div>
-            : <div style={{ color: '#1c1c1c', fontSize: 10, fontFamily: 'monospace', letterSpacing: 3 }}>▸ TAP TO REVEAL</div>
-          }
-        </div>
-
-        {!revealed ? (
-          <button onClick={() => setRevealed(true)} style={{
-            width: '100%', padding: '10px', borderRadius: 7, cursor: 'pointer',
-            border: `1px solid ${color}44`, background: `${color}0d`,
-            color: color, fontSize: 11, fontFamily: 'monospace', letterSpacing: 2,
-          }}>REVEAL ANSWER</button>
-        ) : (
-          <div style={{ display: 'flex', gap: 7 }}>
-            <button onClick={onCorrect} style={{
-              flex: 1, padding: '10px', borderRadius: 7, cursor: 'pointer', fontSize: 11, fontFamily: 'monospace',
-              border: '1px solid #14532d', background: 'rgba(34,197,94,0.07)', color: '#4ade80',
-            }}>✓ CORRECT · STEAL WEDGE + BONUS TURN</button>
-            <button onClick={onWrong} style={{
-              flex: 1, padding: '10px', borderRadius: 7, cursor: 'pointer', fontSize: 11, fontFamily: 'monospace',
-              border: '1px solid #7f1d1d', background: 'rgba(239,68,68,0.07)', color: '#f87171',
-            }}>✗ WRONG · NO STEAL</button>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-// ─── MAIN GAME ─────────────────────────────────────────────────────────────
-export default function Game() {
-  const audioCtxRef = useRef(null);
-
-  const getAudio = () => {
-    if (!audioCtxRef.current) audioCtxRef.current = createAudioCtx();
-    if (audioCtxRef.current?.state === 'suspended') audioCtxRef.current.resume();
-    return audioCtxRef.current;
-  };
-
-  // Start in ROLLING state to figure out who plays first
-  const [state,      setState]      = useState(S.ROLLING);
-  const [active,     setActive]     = useState(0);
-  const [scores,     setScores]     = useState([0, 0]);
-  const [wedges,     setWedges]     = useState([[], []]);
-  const [streak,     setStreak]     = useState([{ cat: null, n: 0 }, { cat: null, n: 0 }]);
-  const [catOptions, setCatOptions] = useState([]);
-  const [chosenCat,  setChosenCat]  = useState(null);
-  const [question,   setQuestion]   = useState(null);
-  const [revealed,   setRevealed]   = useState(false);
-  const [bankCount,  setBankCount]  = useState(null);
-  const [loading,    setLoading]    = useState(false);
-  const [error,      setError]      = useState(null);
-  const [flash,      setFlash]      = useState(null);
-  const [winner,     setWinner]     = useState(null);
-
-  // Expose audioCtxRef globally during mount scope so components can target it easily
-  useEffect(() => {
-    window.audioCtxRef = audioCtxRef;
-    return () => { delete window.audioCtxRef; };
-  }, []);
-
-  useEffect(() => {
-    getBankCount().then(d => setBankCount(d.count)).catch(() => {});
-  }, []);
-
-  const loadCategoryOptions = useCallback(async () => {
-    setLoading(true); setError(null);
-    try {
-      const data = await getCategories();
-      setCatOptions(data.categories);
-      // Only jump straight to CHOOSING if we're not currently settling the pre-game roll
-      setState(prev => prev === S.ROLLING ? S.ROLLING : S.CHOOSING);
-    } catch (e) { setError(e.message); }
-    finally { setLoading(false); }
-  }, []);
-
-  useEffect(() => { loadCategoryOptions(); }, [loadCategoryOptions]);
-
-  // Handles the result of the startup dice roll
-  const handleRollComplete = (winnerIdx) => {
-    setActive(winnerIdx);
-    playWedgeWon(getAudio());
-    setState(S.CHOOSING);
-  };
-
-  const triggerFlash = (type) => {
-    setFlash(type);
-    setTimeout(() => setFlash(null), 600);
-  };
-
-  const consumeQuestion = useCallback(async () => {
-    if (!question) return;
-    try {
-      const r = await markAnswered(question.id);
-      setBankCount(r.bankCount);
-    } catch (e) { console.error(e); }
-  }, [question]);
-
-  const handlePickCategory = async (cat) => {
-    getAudio();
-    setLoading(true); setError(null); setChosenCat(cat);
-    try {
-      const isPieTurn =
-        streak[active].cat === cat &&
-        streak[active].n >= STREAK_NEEDED &&
-        !wedges[active].includes(cat);
-
-      const data = await getQuestion(cat, isPieTurn);
-      setQuestion(data.question);
-      setRevealed(false);
-
-      if (isPieTurn) {
-        playPieSting(getAudio());
-        setState(S.PIE_INTRO);
-      } else {
-        setState(S.QUESTION);
-      }
-    } catch (e) { setError(e.message); }
-    finally { setLoading(false); }
-  };
-
-  const handlePieIntroDone = useCallback(() => {
-    setState(S.PIE);
-  }, []);
-
-  const awardWedge = (teamIdx, cat, currentWedges) => {
-    const newWedges = [currentWedges[0].slice(), currentWedges[1].slice()];
-    if (!newWedges[teamIdx].includes(cat)) newWedges[teamIdx].push(cat);
-    return newWedges;
-  };
-
-  const handleCorrect = async () => {
-    await consumeQuestion();
-    triggerFlash('correct');
-    const newScores = [...scores];
-    newScores[active] += 1;
-    setScores(newScores);
-
-    if (state === S.PIE) {
-      const newWedges = awardWedge(active, chosenCat, wedges);
-      setWedges(newWedges);
-      playWedgeWon(getAudio());
-
-      if (newWedges[active].length === CATEGORIES.length) {
-        setWinner(active); setState(S.WINNER); return;
-      }
-      setStreak(prev => { const n=[...prev]; n[active]={cat:null,n:0}; return n; });
-      setState(S.CHOOSING);
-      return;
-    }
-
-    const prev = streak[active];
-    const newN = prev.cat === chosenCat ? prev.n + 1 : 1;
-    const newStreak = [...streak];
-    newStreak[active] = { cat: chosenCat, n: newN };
-    setStreak(newStreak);
-
-    if (newN >= STREAK_NEEDED && !wedges[active].includes(chosenCat)) {
-      setLoading(true);
-      try {
-        const data = await getQuestion(chosenCat, true);
-        setQuestion(data.question);
-        setStreak(prev => { const n=[...prev]; n[active]={cat:null,n:0}; return n; });
-        playPieSting(getAudio());
-        setState(S.PIE_INTRO);
-      } catch (e) { setError(e.message); }
-      finally { setLoading(false); }
-    } else {
-      setState(S.CHOOSING);
-    }
-  };
-
-  const handleWrong = async () => {
-    await consumeQuestion();
-    triggerFlash('wrong');
-    setStreak(prev => { const n=[...prev]; n[active]={
+  const endAngle   = startAngle + (Math.PI * 2) / 6
