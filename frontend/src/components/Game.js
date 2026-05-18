@@ -359,17 +359,23 @@ export default function Game() {
 
   // Auto-read question aloud whenever a new question loads
   useEffect(() => {
-    if (question && question.question) {
-      setSpeaking(true);
-      stopSpeaking();
+    if (!question?.question) return;
+    if (!window.speechSynthesis) return;
+
+    // Small delay to let the browser settle after state change
+    const timer = setTimeout(() => {
+      window.speechSynthesis.cancel();
       const u = new SpeechSynthesisUtterance(question.question);
       u.rate   = 0.92;
       u.pitch  = 1.0;
       u.volume = 1.0;
-      u.onend  = () => setSpeaking(false);
+      u.onstart = () => setSpeaking(true);
+      u.onend   = () => setSpeaking(false);
       u.onerror = () => setSpeaking(false);
-      window.speechSynthesis?.speak(u);
-    }
+      window.speechSynthesis.speak(u);
+    }, 300);
+
+    return () => clearTimeout(timer);
   }, [question]);
 
   const triggerFlash = (type) => {
