@@ -43,15 +43,26 @@ A: Tyler 'Ninja' Blevins
 
 ━━━ RULES ━━━
 
-UNIQUENESS — Critical:
+UNIQUENESS & DIVERSITY — Critical:
 - Each question must be about a completely DIFFERENT subject
-- Never two questions about the same person, show, film, song, or event in one batch
-- Spread across as many different topics as possible
+- Within each category, spread across WILDLY different sub-topics
+- SCIENCE & NATURE example — do NOT cluster: instead of body parts → body parts → body parts, do: human body → space → animals → chemistry → geology → plants → AI → weather
+- TV, MOVIES & MUSIC example — do NOT cluster: instead of 3 Netflix shows in a row, do: 1960s film → 2020s song → 1980s TV show → recent blockbuster → classic rock band → reality TV
+- GEOGRAPHY: mix continents, mix types (capitals, rivers, mountains, borders, records, nicknames)
+- HISTORY: mix eras (ancient, medieval, 20th century, recent), mix regions (not all American history)
+- SPORTS & VIDEO GAMES: alternate between sports and gaming questions
+- POP CULTURE: mix social media, memes, celebrity, fashion, food trends, internet culture
+- Never write two questions in the same batch that involve the same general topic area
 
 QUESTION STYLE:
 - 2-3 sentences: give interesting context or a fun fact, THEN ask
 - Begin with something engaging — a nickname, a record, an ironic fact, a "before they were famous" angle
 - MAXIMUM 2 "what year" questions per category — vary with: Who, Which, What was the nickname, How many, Name the, What does X stand for, In which city, Who played
+- NEVER end a question with "— what is it?", "— what is this?", "— who is this?", "— what are they?" These are lazy AI patterns. Instead, name the subject in the question itself and ask for a specific fact ABOUT it. 
+- BAD: "This animal is genetically closest to the grey wolf — what is it?"
+- GOOD: "Genetically closer to the grey wolf than any other domestic animal, what is the name of the species humans first domesticated for herding and hunting over 15,000 years ago?"
+- BAD: "This Canadian singer won a Grammy in 2021 — who is she?"
+- GOOD: "Which Canadian singer took home the Grammy for Best Pop Solo Performance in 2021 with her song 'drivers license'?"
 
 DIFFICULTY:
 - Specific enough to be challenging
@@ -107,11 +118,13 @@ ${catInstructions}
 
 REMINDERS FOR THIS BATCH:
 - Every question must be about a DIFFERENT subject — no topic repeats within this batch
+- Within each category, ALTERNATE sub-topics wildly: Science should bounce between space, animals, human body, chemistry, technology, geology, plants — never two similar sub-topics in a row
 - Write in Trivial Pursuit style: context first (2-3 sentences), then the question
 - Maximum 2 "what year" or "what year did" questions per category
-- TV, Movies & Music: spread across Boomer, Gen X/Millennial, AND recent eras
+- NEVER end with "— what is it?", "— who is this?", "— what are they?" — name the subject IN the question and ask for a specific fact about it
+- TV, Movies & Music: spread across Boomer, Gen X/Millennial, AND recent eras — alternate between them
 - Pie questions need a very specific, precise answer
-- Vary question openers: "Known as...", "Before becoming famous for...", "Despite holding the record for...", "This [actor/musician/athlete]...", "Named after...", etc.
+- Vary question openers: "Known as...", "Before becoming famous for...", "Despite holding the record for...", "Which [country/film/song]...", "Named after...", etc.
 
 Respond ONLY with: { "questions": [...] }`;
 }
@@ -168,8 +181,9 @@ async function refillBank(focusCategories = null) {
       console.log(`  Generating batch ${i}/${batchesNeeded}...`);
       const questions = await generateBatch(i, focusCategories);
       const inserted  = await insertQuestions(questions);
-      totalAdded += inserted;
-      console.log(`  ✅ Batch ${i}: ${inserted} inserted (${questions.length - inserted} duplicates skipped)`);
+      const count = parseInt(inserted) || 0;
+      totalAdded += count;
+      console.log(`  ✅ Batch ${i}: ${count} inserted (${questions.length - count} duplicates skipped)`);
       if (i < batchesNeeded) await new Promise(r => setTimeout(r, 1000));
     }
 
@@ -206,4 +220,4 @@ async function checkAndRefillIfNeeded() {
   }
 }
 
-module.exports = { refillBank, checkAndRefillIfNeeded, isRefilling: () => isRefilling };
+module.exports = { refillBank, checkAndRefillIfNeeded, isRefilling: () => isRefilling, generateBatch };
