@@ -46,22 +46,54 @@ function playPieSting(ctx) {
   src.start(t + 0.55);
 }
 
-// 🏆 Wedge won — celebratory fanfare
+// 🏆 Wedge won — BIG celebratory fanfare
 function playWedgeWon(ctx) {
   if (!ctx) return;
   const t = ctx.currentTime;
-  // Rising scale
   [261, 329, 392, 523, 659, 784, 1047].forEach((f, i) =>
     playTone(ctx, f, t + i * 0.08, 0.18, 'triangle', 0.2)
   );
-  // Big chord sustain
   [523, 659, 784, 1047].forEach(f =>
-    playTone(ctx, f, t + 0.62, 1.2, 'sine', 0.14)
+    playTone(ctx, f, t + 0.62, 1.5, 'sine', 0.16)
   );
-  // Rhythm hits
-  [0, 0.18, 0.36].forEach(offset =>
-    playTone(ctx, 880, t + 0.65 + offset, 0.1, 'square', 0.08)
+  [0, 0.18, 0.36, 0.54].forEach(offset =>
+    playTone(ctx, 880, t + 0.65 + offset, 0.1, 'square', 0.1)
   );
+  // Extra high shimmer
+  [1318, 1568, 2093].forEach((f, i) =>
+    playTone(ctx, f, t + 0.8 + i * 0.12, 0.3, 'sine', 0.08)
+  );
+}
+
+// 🎊 Game winner — epic full fanfare
+function playGameWon(ctx) {
+  if (!ctx) return;
+  const t = ctx.currentTime;
+  // Full ascending scale twice
+  [261, 329, 392, 523, 659, 784, 1047, 1318].forEach((f, i) =>
+    playTone(ctx, f, t + i * 0.07, 0.2, 'triangle', 0.22)
+  );
+  // Big chord
+  [523, 659, 784, 1047, 1318].forEach(f =>
+    playTone(ctx, f, t + 0.62, 2.5, 'sine', 0.15)
+  );
+  // Rhythm pattern
+  [0, 0.15, 0.3, 0.5, 0.65, 0.8].forEach(offset =>
+    playTone(ctx, 1047, t + 0.7 + offset, 0.1, 'square', 0.09)
+  );
+  // Cymbal crashes
+  for (let crash = 0; crash < 3; crash++) {
+    const buf = ctx.createBuffer(1, ctx.sampleRate * 0.4, ctx.sampleRate);
+    const data = buf.getChannelData(0);
+    for (let i = 0; i < data.length; i++) data[i] = (Math.random() * 2 - 1) * Math.exp(-i / (ctx.sampleRate * 0.15));
+    const src = ctx.createBufferSource();
+    const g = ctx.createGain();
+    src.buffer = buf;
+    src.connect(g); g.connect(ctx.destination);
+    g.gain.setValueAtTime(0.2, t + crash * 0.5);
+    g.gain.exponentialRampToValueAtTime(0.001, t + crash * 0.5 + 0.4);
+    src.start(t + crash * 0.5);
+  }
 }
 
 // 🕵️ Steal opportunity — tense suspense sting
@@ -94,20 +126,54 @@ function playCorrect(ctx) {
   playTone(ctx, 1047,t + 0.28, 0.25, 'sine', 0.18);
 }
 
-// 🔊 Text-to-speech helpers
-function speakText(text) {
-  if (!window.speechSynthesis) return;
-  window.speechSynthesis.cancel(); // stop any current speech
-  const utterance = new SpeechSynthesisUtterance(text);
-  utterance.rate  = 0.92;  // slightly slower for clarity
-  utterance.pitch = 1.0;
-  utterance.volume = 1.0;
-  window.speechSynthesis.speak(utterance);
+// 🔊 OpenAI TTS — plays question audio via backend
+const OPENAI_VOICES = ['nova', 'alloy', 'echo', 'fable', 'onyx', 'shimmer'];
+const VOICE_LABELS  = {
+  nova:    'Nova (friendly female)',
+  alloy:   'Alloy (neutral)',
+  echo:    'Echo (warm male)',
+  fable:   'Fable (British)',
+  onyx:    'Onyx (deep male)',
+  shimmer: 'Shimmer (soft female)',
+};
+
+let currentAudio = null;
+
+async function playTTS(text, voice = 'nova', onStart, onEnd, onError) {
+  try {
+    // Stop any current audio
+    if (currentAudio) { currentAudio.pause(); currentAudio = null; }
+
+    const BASE = process.env.REACT_APP_API_URL || '';
+    const response = await fetch(`${BASE}/api/tts`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text, voice }),
+    });
+
+    if (!response.ok) throw new Error('TTS request failed');
+
+    const blob = await response.blob();
+    const url  = URL.createObjectURL(blob);
+    const audio = new Audio(url);
+    currentAudio = audio;
+
+    audio.onplay  = onStart;
+    audio.onended = () => { URL.revokeObjectURL(url); currentAudio = null; onEnd?.(); };
+    audio.onerror = () => { URL.revokeObjectURL(url); currentAudio = null; onError?.(); };
+
+    await audio.play();
+  } catch (err) {
+    console.error('TTS failed:', err);
+    onError?.();
+  }
 }
 
-function stopSpeaking() {
-  if (window.speechSynthesis) window.speechSynthesis.cancel();
+function stopTTS() {
+  if (currentAudio) { currentAudio.pause(); currentAudio = null; }
 }
+
+function stopSpeaking() { stopTTS(); }
 
 // 🏀 Team switch swish sound
 function playSwish(ctx) {
@@ -144,21 +210,21 @@ const S = {
   QUESTION:    'question',
   PIE_INTRO:   'pie_intro',
   PIE:         'pie',
+  PIE_WIN:     'pie_win',     // splashy wedge celebration
   STEAL:       'steal',
-  FINAL_PICK:  'final_pick',   // opponent picks final question category
-  FINAL:       'final',        // final question active
+  FINAL_PICK:  'final_pick',
+  FINAL:       'final',
   WINNER:      'winner',
 };
 
 // ─── PIE INTRO ANIMATION ───────────────────────────────────────────────────
 function PieIntro({ category, teamIdx, onDone }) {
   const [step, setStep] = useState(0);
-  // step 0: fade in wedge, step 1: text appears, step 2: done
   useEffect(() => {
     const timers = [
       setTimeout(() => setStep(1), 600),
       setTimeout(() => setStep(2), 1800),
-      setTimeout(onDone, 2600),
+      setTimeout(onDone, 3000), // slightly longer so TTS starts after animation
     ];
     return () => timers.forEach(clearTimeout);
   }, [onDone]);
@@ -217,7 +283,140 @@ function PieIntro({ category, teamIdx, onDone }) {
   );
 }
 
-// Single pie wedge graphic
+// ─── PIE WIN CELEBRATION ───────────────────────────────────────────────────
+const pieWinStyles = ['fireworks', 'confetti', 'wedge'];
+let pieWinStyleIndex = 0;
+
+function PieWinCelebration({ category, teamIdx, onDone }) {
+  const style = pieWinStyles[pieWinStyleIndex % 3];
+  pieWinStyleIndex++;
+  const color = CAT_COLORS[category];
+  const team  = TEAMS[teamIdx];
+
+  useEffect(() => {
+    const t = setTimeout(onDone, 3000);
+    return () => clearTimeout(t);
+  }, [onDone]);
+
+  // Generate confetti particles
+  const confetti = Array.from({ length: 60 }, (_, i) => ({
+    id: i,
+    x: Math.random() * 100,
+    delay: Math.random() * 1.5,
+    dur: 1.5 + Math.random(),
+    color: ['#fbbf24','#ef4444','#3b82f6','#22c55e','#ec4899','#a855f7'][i % 6],
+    size: 6 + Math.random() * 10,
+    rot: Math.random() * 360,
+  }));
+
+  // Fireworks particles
+  const sparks = Array.from({ length: 40 }, (_, i) => ({
+    id: i,
+    angle: (i / 40) * 360,
+    dist: 80 + Math.random() * 120,
+    color: ['#fbbf24','#fff','#ef4444','#3b82f6','#22c55e','#ec4899'][i % 6],
+    delay: Math.random() * 0.5,
+  }));
+
+  return (
+    <div style={{
+      position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.93)',
+      display: 'flex', flexDirection: 'column', alignItems: 'center',
+      justifyContent: 'center', zIndex: 200, overflow: 'hidden',
+    }}>
+      <style>{`
+        @keyframes confettiFall {
+          0%   { transform: translateY(-20px) rotate(0deg); opacity: 1; }
+          100% { transform: translateY(100vh) rotate(720deg); opacity: 0; }
+        }
+        @keyframes sparkFly {
+          0%   { transform: translate(0,0) scale(1); opacity: 1; }
+          100% { transform: translate(var(--dx), var(--dy)) scale(0); opacity: 0; }
+        }
+        @keyframes wedgeSpin {
+          0%   { transform: scale(0.2) rotate(-180deg); opacity: 0; }
+          60%  { transform: scale(1.3) rotate(10deg); opacity: 1; }
+          100% { transform: scale(1) rotate(0deg); opacity: 1; }
+        }
+        @keyframes celebPulse {
+          0%,100% { transform: scale(1); }
+          50%     { transform: scale(1.06); }
+        }
+        @keyframes titleBounce {
+          0%   { transform: translateY(-40px); opacity: 0; }
+          60%  { transform: translateY(8px); }
+          100% { transform: translateY(0); opacity: 1; }
+        }
+      `}</style>
+
+      {/* CONFETTI style */}
+      {style === 'confetti' && confetti.map(p => (
+        <div key={p.id} style={{
+          position: 'absolute',
+          left: `${p.x}%`,
+          top: '-20px',
+          width: p.size,
+          height: p.size * 0.4,
+          background: p.color,
+          borderRadius: 2,
+          animation: `confettiFall ${p.dur}s ${p.delay}s ease-in both`,
+          transform: `rotate(${p.rot}deg)`,
+        }} />
+      ))}
+
+      {/* FIREWORKS style */}
+      {style === 'fireworks' && [
+        { cx: '30%', cy: '30%' },
+        { cx: '70%', cy: '25%' },
+        { cx: '50%', cy: '40%' },
+      ].map((pos, bi) =>
+        sparks.slice(bi * 13, bi * 13 + 13).map(p => {
+          const rad = (p.angle * Math.PI) / 180;
+          return (
+            <div key={`${bi}-${p.id}`} style={{
+              position: 'absolute',
+              left: pos.cx, top: pos.cy,
+              width: 6, height: 6,
+              borderRadius: '50%',
+              background: p.color,
+              '--dx': `${Math.cos(rad) * p.dist}px`,
+              '--dy': `${Math.sin(rad) * p.dist}px`,
+              animation: `sparkFly 0.8s ${p.delay + bi * 0.3}s ease-out both`,
+            }} />
+          );
+        })
+      )}
+
+      {/* WEDGE ZOOM style */}
+      {style === 'wedge' && (
+        <div style={{ animation: 'wedgeSpin 0.7s cubic-bezier(0.34,1.56,0.64,1) forwards', marginBottom: 20 }}>
+          <PieWedge color={color} emoji={CAT_EMOJI[category]} size={220} />
+        </div>
+      )}
+
+      {/* Central message — all styles */}
+      <div style={{
+        textAlign: 'center', zIndex: 10,
+        animation: 'titleBounce 0.6s 0.3s ease both',
+      }}>
+        <div style={{ fontSize: 48, marginBottom: 8 }}>🎉</div>
+        <div style={{
+          fontSize: 'clamp(28px,6vw,52px)', fontWeight: 900, color: team.color,
+          animation: 'celebPulse 0.8s ease infinite',
+          textShadow: `0 0 40px ${team.color}`,
+        }}>
+          {team.emoji} {team.label.toUpperCase()}
+        </div>
+        <div style={{ fontSize: 20, color: color, fontFamily: 'monospace', letterSpacing: 3, marginTop: 8 }}>
+          WINS THE {CAT_EMOJI[category]} {category.toUpperCase()} WEDGE!
+        </div>
+        <div style={{ fontSize: 13, color: '#444', fontFamily: 'monospace', marginTop: 16 }}>
+          continuing in 3 seconds...
+        </div>
+      </div>
+    </div>
+  );
+}
 function PieWedge({ color, emoji, size = 160 }) {
   const cx = size / 2, cy = size / 2, r = size / 2 - 8;
   const startAngle = -Math.PI / 2;
@@ -343,7 +542,7 @@ export default function Game() {
   };
 
   const [state,      setState]      = useState(S.CHOOSING);
-  const [active,     setActive]     = useState(0);
+  const [active,     setActive]     = useState(() => Math.random() < 0.5 ? 0 : 1); // random start
   const [scores,     setScores]     = useState([0, 0]);
   const [wedges,     setWedges]     = useState([[], []]);
   const [streak,     setStreak]     = useState([{}, {}]);
@@ -357,12 +556,10 @@ export default function Game() {
   const [error,      setError]      = useState(null);
   const [flash,      setFlash]      = useState(null);
   const [winner,     setWinner]     = useState(null);
-  const [speaking,   setSpeaking]   = useState(false);
-  const [voices,     setVoices]     = useState([]);
-  const [selectedVoice, setSelectedVoice] = useState('');
-  // finalTeam = team that has all wedges and needs final question
+  const [pieWinCat,     setPieWinCat]     = useState(null);
+  const [speaking,      setSpeaking]      = useState(false);
+  const [selectedVoice, setSelectedVoice] = useState('nova');
   const [finalTeam,     setFinalTeam]     = useState(null);
-  // categories already used for final question attempts — can't be picked again
   const [finalUsedCats, setFinalUsedCats] = useState([]);
 
   // Load available voices
@@ -402,31 +599,25 @@ export default function Game() {
 
   useEffect(() => { loadCategoryOptions(0, [[], []]); }, [loadCategoryOptions]);
 
-  // Speak helper — uses selected voice
+  // Speak helper — uses OpenAI TTS via backend
   const speak = useCallback((text) => {
-    if (!window.speechSynthesis || !text) return;
-    window.speechSynthesis.cancel();
-    const u = new SpeechSynthesisUtterance(text);
-    u.rate   = 0.92;
-    u.pitch  = 1.0;
-    u.volume = 1.0;
-    if (selectedVoice) {
-      const voice = window.speechSynthesis.getVoices().find(v => v.name === selectedVoice);
-      if (voice) u.voice = voice;
-    }
-    u.onstart = () => setSpeaking(true);
-    u.onend   = () => setSpeaking(false);
-    u.onerror = () => setSpeaking(false);
-    window.speechSynthesis.speak(u);
+    if (!text) return;
+    setSpeaking(true);
+    playTTS(
+      text,
+      selectedVoice,
+      () => setSpeaking(true),
+      () => setSpeaking(false),
+      () => setSpeaking(false),
+    );
   }, [selectedVoice]);
 
   // Auto-read question aloud whenever a new question loads
   useEffect(() => {
     if (!question?.question) return;
-    if (!window.speechSynthesis) return;
     const timer = setTimeout(() => speak(question.question), 300);
-    return () => clearTimeout(timer);
-  }, [question, speak]);
+    return () => { clearTimeout(timer); stopTTS(); };
+  }, [question]); // eslint-disable-line
 
   const triggerFlash = (type) => {
     setFlash(type);
@@ -500,6 +691,7 @@ export default function Game() {
 
     if (state === S.FINAL) {
       // Won the final question — game over!
+      playGameWon(getAudio());
       setWinner(active);
       setState(S.WINNER);
       return;
@@ -511,8 +703,14 @@ export default function Game() {
       playWedgeWon(getAudio());
       setStreak(prev => { const n=[...prev]; n[active]={...n[active],[chosenCat]:0}; return n; });
 
-      if (checkForFinal(active, newWedges, active)) return;
-      await loadCategoryOptions(active, newWedges);
+      if (newWedges[active].length === CATEGORIES.length) {
+        // Check for final question instead of instant win
+        if (checkForFinal(active, newWedges, active)) return;
+      }
+
+      // Show pie win celebration
+      setPieWinCat(chosenCat);
+      setState(S.PIE_WIN);
       return;
     }
 
@@ -579,8 +777,10 @@ export default function Game() {
 
     if (checkForFinal(stealingTeam, newWedges, stealingTeam)) return;
 
+    // Show pie win celebration for stealing team
+    setPieWinCat(chosenCat);
     setActive(stealingTeam);
-    await loadCategoryOptions(stealingTeam, newWedges);
+    setState(S.PIE_WIN);
   };
 
   const handleStealWrong = async () => {
@@ -592,8 +792,11 @@ export default function Game() {
     await loadCategoryOptions(nextTeam, wedges);
   };
 
-  // Final question: opponent picks a category
-  const handleFinalCategoryPick = async (cat) => {
+  // Called when pie win celebration finishes — continue game
+  const handlePieWinDone = useCallback(async () => {
+    setPieWinCat(null);
+    await loadCategoryOptions(active, wedges);
+  }, [active, wedges, loadCategoryOptions]); = async (cat) => {
     setLoading(true); setError(null); setChosenCat(cat); setRevealed(false);
     setFinalUsedCats(prev => [...prev, cat]); // mark this category as used
     try {
@@ -607,24 +810,66 @@ export default function Game() {
   // ── WINNER ────────────────────────────────────────────────────────────────
   if (state === S.WINNER && winner !== null) {
     return (
-      <div style={css.page}>
-        <style>{`@keyframes celebrate { 0%,100%{transform:rotate(-3deg)} 50%{transform:rotate(3deg)} }`}</style>
-        <div style={{ textAlign:'center', display:'flex', flexDirection:'column', alignItems:'center', gap:16 }}>
-          <div style={{ fontSize:64, animation:'celebrate 0.5s ease infinite' }}>🏆</div>
-          <div style={{ fontSize:11, letterSpacing:6, color:TEAMS[winner].color, fontFamily:'monospace' }}>WINNER</div>
-          <div style={{ fontSize:40, color:'#fff', fontWeight:900 }}>{TEAMS[winner].emoji} {TEAMS[winner].label}</div>
-          <div style={{ fontSize:12, color:'#555', fontFamily:'monospace' }}>ALL {CATEGORIES.length} WEDGES COLLECTED</div>
-          <PieDisplay wedges={wedges[winner]} size={150} />
-          <div style={{ display:'flex', gap:32, marginTop:8 }}>
+      <div style={{ minHeight:'100vh', background:'#0a0a0a', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', fontFamily:'Georgia,serif', padding:24, overflow:'hidden', position:'relative' }}>
+        <style>{`
+          @keyframes winnerPop   { 0%{transform:scale(0.5);opacity:0} 70%{transform:scale(1.1)} 100%{transform:scale(1);opacity:1} }
+          @keyframes winnerGlow  { 0%,100%{text-shadow:0 0 30px ${TEAMS[winner].color}} 50%{text-shadow:0 0 80px ${TEAMS[winner].color}, 0 0 120px ${TEAMS[winner].color}} }
+          @keyframes trophySpin  { 0%{transform:rotateY(0deg)} 100%{transform:rotateY(360deg)} }
+          @keyframes starFloat   { 0%,100%{transform:translateY(0) rotate(0deg)} 50%{transform:translateY(-20px) rotate(180deg)} }
+          @keyframes bgPulse     { 0%,100%{background:rgba(0,0,0,0)} 50%{background:rgba(${TEAMS[winner].color === '#3b82f6' ? '59,130,246' : '236,72,153'},0.05)} }
+        `}</style>
+
+        {/* Floating stars background */}
+        {Array.from({length:20},(_,i) => (
+          <div key={i} style={{
+            position:'absolute',
+            left:`${Math.random()*100}%`,
+            top:`${Math.random()*100}%`,
+            fontSize: 16 + Math.random()*24,
+            animation:`starFloat ${2+Math.random()*2}s ${Math.random()*2}s ease-in-out infinite`,
+            opacity: 0.3 + Math.random()*0.4,
+          }}>⭐</div>
+        ))}
+
+        <div style={{ textAlign:'center', display:'flex', flexDirection:'column', alignItems:'center', gap:20, zIndex:10 }}>
+          <div style={{ fontSize:80, animation:'trophySpin 2s ease-in-out' }}>🏆</div>
+
+          <div style={{ fontSize:13, letterSpacing:8, color:TEAMS[winner].color, fontFamily:'monospace', animation:'winnerPop 0.6s ease both' }}>
+            CHAMPION
+          </div>
+
+          <div style={{
+            fontSize:'clamp(40px,8vw,72px)', color:TEAMS[winner].color, fontWeight:900,
+            animation:'winnerGlow 1.5s ease infinite, winnerPop 0.5s 0.2s ease both',
+            opacity:0,
+          }}>
+            {TEAMS[winner].emoji} {TEAMS[winner].label.toUpperCase()}
+          </div>
+
+          <div style={{ fontSize:14, color:'#555', fontFamily:'monospace', letterSpacing:2 }}>
+            ALL {CATEGORIES.length} WEDGES + FINAL QUESTION ANSWERED
+          </div>
+
+          <PieDisplay wedges={wedges[winner]} size={160} />
+
+          <div style={{ display:'flex', gap:40, marginTop:8 }}>
             {TEAMS.map((t,i) => (
-              <div key={i} style={{ textAlign:'center' }}>
-                <div style={{ color:t.color, fontSize:11, fontFamily:'monospace' }}>{t.emoji} {t.label.toUpperCase()}</div>
-                <div style={{ color:'#fff', fontSize:28, fontWeight:900, fontFamily:'monospace' }}>{scores[i]}</div>
-                <div style={{ color:'#444', fontSize:10, fontFamily:'monospace' }}>{wedges[i].length}/{CATEGORIES.length} wedges</div>
+              <div key={i} style={{ textAlign:'center', opacity: i === winner ? 1 : 0.4 }}>
+                <div style={{ color:t.color, fontSize:13, fontFamily:'monospace' }}>{t.emoji} {t.label.toUpperCase()}</div>
+                <div style={{ color:'#fff', fontSize:32, fontWeight:900, fontFamily:'monospace' }}>{scores[i]}</div>
+                <div style={{ color:'#555', fontSize:11, fontFamily:'monospace' }}>{wedges[i].length}/{CATEGORIES.length} wedges</div>
               </div>
             ))}
           </div>
-          <button onClick={() => window.location.reload()} style={css.btn('#555')}>↺ PLAY AGAIN</button>
+
+          <button onClick={() => window.location.reload()} style={{
+            marginTop:8, padding:'14px 36px', borderRadius:10,
+            border:`2px solid ${TEAMS[winner].color}`,
+            background:`${TEAMS[winner].color}18`,
+            color:TEAMS[winner].color, cursor:'pointer',
+            fontFamily:'monospace', fontSize:14, letterSpacing:3,
+            fontWeight:700,
+          }}>↺ PLAY AGAIN</button>
         </div>
       </div>
     );
@@ -639,6 +884,11 @@ export default function Game() {
       {/* Pie intro overlay */}
       {state === S.PIE_INTRO && chosenCat && (
         <PieIntro category={chosenCat} teamIdx={active} onDone={handlePieIntroDone} />
+      )}
+
+      {/* Pie win celebration overlay */}
+      {state === S.PIE_WIN && pieWinCat && (
+        <PieWinCelebration category={pieWinCat} teamIdx={active} onDone={handlePieWinDone} />
       )}
 
       {/* Steal overlay */}
@@ -660,25 +910,23 @@ export default function Game() {
             {bankCount} questions in bank{bankCount < 250 ? ' · refilling...' : ''}
           </div>
         )}
-        {/* Voice selector */}
-        {voices.length > 0 && (
-          <div style={{ marginTop:8, display:'flex', alignItems:'center', justifyContent:'center', gap:8 }}>
-            <span style={{ fontSize:10, color:'#444', fontFamily:'monospace' }}>🔊</span>
-            <select
-              value={selectedVoice}
-              onChange={e => { setSelectedVoice(e.target.value); stopSpeaking(); setSpeaking(false); }}
-              style={{
-                background:'#111', border:'1px solid #222', borderRadius:4,
-                color:'#666', fontSize:10, fontFamily:'monospace', padding:'3px 8px',
-                cursor:'pointer', maxWidth:220,
-              }}
-            >
-              {voices.filter(v => v.lang.startsWith('en')).map(v => (
-                <option key={v.name} value={v.name}>{v.name}</option>
-              ))}
-            </select>
-          </div>
-        )}
+        {/* OpenAI Voice selector */}
+        <div style={{ marginTop:8, display:'flex', alignItems:'center', justifyContent:'center', gap:8 }}>
+          <span style={{ fontSize:10, color:'#444', fontFamily:'monospace' }}>🔊 VOICE:</span>
+          <select
+            value={selectedVoice}
+            onChange={e => { setSelectedVoice(e.target.value); stopTTS(); setSpeaking(false); }}
+            style={{
+              background:'#111', border:'1px solid #222', borderRadius:4,
+              color:'#888', fontSize:10, fontFamily:'monospace', padding:'3px 8px',
+              cursor:'pointer', maxWidth:220,
+            }}
+          >
+            {OPENAI_VOICES.map(v => (
+              <option key={v} value={v}>{VOICE_LABELS[v]}</option>
+            ))}
+          </select>
+        </div>
       </div>
 
       {/* Scoreboards */}
@@ -839,11 +1087,8 @@ export default function Game() {
               {/* Stop / Replay button */}
               <button
                 onClick={() => {
-                  if (speaking) {
-                    stopSpeaking(); setSpeaking(false);
-                  } else {
-                    speak(question.question);
-                  }
+                  if (speaking) { stopTTS(); setSpeaking(false); }
+                  else { speak(question.question); }
                 }}
                 title={speaking ? 'Stop reading' : 'Read again'}
                 style={{
