@@ -335,10 +335,32 @@ export default function Game() {
   const [flash,      setFlash]      = useState(null);
   const [winner,     setWinner]     = useState(null);
   const [speaking,   setSpeaking]   = useState(false);
+  const [voices,     setVoices]     = useState([]);
+  const [selectedVoice, setSelectedVoice] = useState('');
   // finalTeam = team that has all wedges and needs final question
   const [finalTeam,     setFinalTeam]     = useState(null);
   // categories already used for final question attempts — can't be picked again
   const [finalUsedCats, setFinalUsedCats] = useState([]);
+
+  // Load available voices
+  useEffect(() => {
+    const loadVoices = () => {
+      const v = window.speechSynthesis?.getVoices() || [];
+      if (v.length > 0) {
+        setVoices(v);
+        // Auto-select first English voice, prefer Microsoft or Google natural voices
+        const preferred = v.find(x =>
+          x.name.includes('Jenny') || x.name.includes('Aria') ||
+          x.name.includes('Zira') || x.name.includes('Google UK') ||
+          x.name.includes('Samantha')
+        ) || v.find(x => x.lang.startsWith('en')) || v[0];
+        setSelectedVoice(preferred?.name || '');
+      }
+    };
+    loadVoices();
+    window.speechSynthesis?.addEventListener('voiceschanged', loadVoices);
+    return () => window.speechSynthesis?.removeEventListener('voiceschanged', loadVoices);
+  }, []);
 
   useEffect(() => {
     getBankCount().then(d => setBankCount(d.count)).catch(() => {});
@@ -357,26 +379,31 @@ export default function Game() {
 
   useEffect(() => { loadCategoryOptions(0, [[], []]); }, [loadCategoryOptions]);
 
+  // Speak helper — uses selected voice
+  const speak = useCallback((text) => {
+    if (!window.speechSynthesis || !text) return;
+    window.speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(text);
+    u.rate   = 0.92;
+    u.pitch  = 1.0;
+    u.volume = 1.0;
+    if (selectedVoice) {
+      const voice = window.speechSynthesis.getVoices().find(v => v.name === selectedVoice);
+      if (voice) u.voice = voice;
+    }
+    u.onstart = () => setSpeaking(true);
+    u.onend   = () => setSpeaking(false);
+    u.onerror = () => setSpeaking(false);
+    window.speechSynthesis.speak(u);
+  }, [selectedVoice]);
+
   // Auto-read question aloud whenever a new question loads
   useEffect(() => {
     if (!question?.question) return;
     if (!window.speechSynthesis) return;
-
-    // Small delay to let the browser settle after state change
-    const timer = setTimeout(() => {
-      window.speechSynthesis.cancel();
-      const u = new SpeechSynthesisUtterance(question.question);
-      u.rate   = 0.92;
-      u.pitch  = 1.0;
-      u.volume = 1.0;
-      u.onstart = () => setSpeaking(true);
-      u.onend   = () => setSpeaking(false);
-      u.onerror = () => setSpeaking(false);
-      window.speechSynthesis.speak(u);
-    }, 300);
-
+    const timer = setTimeout(() => speak(question.question), 300);
     return () => clearTimeout(timer);
-  }, [question]);
+  }, [question, speak]);
 
   const triggerFlash = (type) => {
     setFlash(type);
@@ -608,6 +635,25 @@ export default function Game() {
             {bankCount} questions in bank{bankCount < 250 ? ' · refilling...' : ''}
           </div>
         )}
+        {/* Voice selector */}
+        {voices.length > 0 && (
+          <div style={{ marginTop:8, display:'flex', alignItems:'center', justifyContent:'center', gap:8 }}>
+            <span style={{ fontSize:10, color:'#444', fontFamily:'monospace' }}>🔊</span>
+            <select
+              value={selectedVoice}
+              onChange={e => { setSelectedVoice(e.target.value); stopSpeaking(); setSpeaking(false); }}
+              style={{
+                background:'#111', border:'1px solid #222', borderRadius:4,
+                color:'#666', fontSize:10, fontFamily:'monospace', padding:'3px 8px',
+                cursor:'pointer', maxWidth:220,
+              }}
+            >
+              {voices.filter(v => v.lang.startsWith('en')).map(v => (
+                <option key={v.name} value={v.name}>{v.name}</option>
+              ))}
+            </select>
+          </div>
+        )}
       </div>
 
       {/* Scoreboards */}
@@ -771,13 +817,7 @@ export default function Game() {
                   if (speaking) {
                     stopSpeaking(); setSpeaking(false);
                   } else {
-                    setSpeaking(true);
-                    stopSpeaking();
-                    const u = new SpeechSynthesisUtterance(question.question);
-                    u.rate = 0.92; u.pitch = 1.0; u.volume = 1.0;
-                    u.onend = () => setSpeaking(false);
-                    u.onerror = () => setSpeaking(false);
-                    window.speechSynthesis?.speak(u);
+                    speak(question.question);
                   }
                 }}
                 title={speaking ? 'Stop reading' : 'Read again'}
