@@ -647,9 +647,6 @@ export default function Game() {
     } catch (e) { console.error(e); }
   }, [question]);
 
-  // Pre-fetched audio URL — ready to play as soon as question appears
-  const pendingAudioRef = useRef(null);
-
   // Team picks a category from the choosing screen
   const handlePickCategory = async (cat) => {
     getAudio(); // unlock audio context on user tap
