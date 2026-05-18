@@ -74,17 +74,20 @@ CONTENT MIX per batch:
 - 35% Gen X/Millennial (1980–2010): 80s/90s TV, classic films, grunge/hip-hop/pop, early internet
 - 30% Boomer (1960–1980): classic rock, vintage Hollywood, 70s/80s sports legends, historic TV
 
-TV, MOVIES & MUSIC must include ALL eras — classic rock legends, 80s/90s blockbusters, 2000s TV hits, AND recent streaming shows. Never just recent pop stars.
+TV, MOVIES & MUSIC must include ALL eras with these ratios:
+- 40% RECENT (2020-2025): current streaming hits, recent blockbusters, Gen Z artists (Olivia Rodrigo, Sabrina Carpenter, SZA, Bad Bunny, Kendrick, The Weeknd, Taylor Swift, Chappell Roan), K-pop, reality TV
+- 30% MILLENNIAL/GEN X (1990-2010): Friends, Seinfeld, The Office, Breaking Bad, Sopranos, 90s hip hop, Britney, NSYNC, Backstreet Boys, Eminem, 2000s blockbusters, grunge
+- 30% BOOMER (1960-1990): Beatles, Rolling Stones, Led Zeppelin, ABBA, Fleetwood Mac, classic Hollywood, M*A*S*H, Cheers, All in the Family, 80s pop
 
-GEOGRAPHY: Go beyond capitals — ask about rivers, records, borders, nicknames, colonial history, natural wonders.
-
-HISTORY: Ask about causes, consequences, nicknames, treaties, firsts — not just dates.
-
-SCIENCE & NATURE: Mix biology, space, tech, inventions, human body, animal kingdom, AI, recent discoveries.
-
-SPORTS & VIDEO GAMES: Cover classic sports legends, recent champions, iconic video game characters, gaming records, esports.
-
-POP CULTURE: Memes, viral moments, TikTok trends, reality TV, celebrity drama, influencers, internet firsts, Gen Z slang, YouTube milestones.
+POP CULTURE — at least 60% of questions must be things a 15-year-old would know:
+- TikTok creators, sounds, trends, dances (MrBeast, Charli D'Amelio, specific viral sounds)
+- Viral memes and internet moments (2019-2025) that teenagers reference
+- YouTube milestones (first video to 1 billion views, etc.)
+- Celebrity drama teens follow (Taylor vs Scooter, Kanye drama, etc.)
+- Streaming moments that went viral on social media
+- Gen Z slang, phrases, and internet culture
+- Viral products and food trends (Stanley cups, Grimace shake, etc.)
+- Fortnite/gaming culture crossovers and collaborations
 
 OTHER RULES:
 - 90% global, maximum 10% Canadian
