@@ -52,18 +52,18 @@ async function initDB() {
     await client.query(`CREATE INDEX IF NOT EXISTS idx_q_used ON questions(used)`);
     await client.query(`CREATE INDEX IF NOT EXISTS idx_q_pie ON questions(is_pie, used)`);
 
-    // Unique constraint to prevent duplicate questions
-    await client.query(`
-      CREATE UNIQUE INDEX IF NOT EXISTS idx_q_unique_question 
-      ON questions(LOWER(question))
-    `);
-
-    // Clean up any existing duplicates (keep lowest id)
+    // Clean up any existing duplicates FIRST (keep lowest id)
     await client.query(`
       DELETE FROM questions
       WHERE id NOT IN (
         SELECT MIN(id) FROM questions GROUP BY LOWER(question)
       )
+    `);
+
+    // Now safe to create unique index
+    await client.query(`
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_q_unique_question 
+      ON questions(LOWER(question))
     `);
 
     console.log('✅ DB schema ready');
