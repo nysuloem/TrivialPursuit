@@ -426,8 +426,9 @@ function CategorySplash({ category, teamIdx, onReady }) {
 
   useEffect(() => {
     const t1 = setTimeout(() => setStep(1), 150);
-    const t2 = setTimeout(() => setStep(2), 500);
-    const t3 = setTimeout(onReady, 1500);
+    const t2 = setTimeout(() => setStep(2), 600);
+    // Minimum display of 1s, then signal ready — parent will call onReady when audio is fetched
+    const t3 = setTimeout(onReady, 3500); // fallback max
     return () => [t1, t2, t3].forEach(clearTimeout);
   }, [onReady]);
 
@@ -747,6 +748,27 @@ export default function Game() {
   const handleSplashDone = useCallback(() => {
     setState(S.QUESTION);
   }, []);
+
+  // Watch for audio being ready and dismiss splash early if it's done
+  useEffect(() => {
+    if (state !== S.CAT_SPLASH || !pendingAudioRef.current) return;
+    let cancelled = false;
+    const minDelay = 1200; // always show splash for at least 1.2s
+    const start = Date.now();
+
+    pendingAudioRef.current.then(() => {
+      if (cancelled) return;
+      const elapsed = Date.now() - start;
+      const remaining = Math.max(0, minDelay - elapsed);
+      setTimeout(() => {
+        if (!cancelled) setState(S.QUESTION);
+      }, remaining);
+    }).catch(() => {
+      if (!cancelled) setTimeout(() => setState(S.QUESTION), 500);
+    });
+
+    return () => { cancelled = true; };
+  }, [state]);
 
   // Called when pie intro animation finishes — ensure revealed is false
   const handlePieIntroDone = useCallback(() => {
