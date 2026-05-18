@@ -206,15 +206,16 @@ const TEAMS = [
 ];
 
 const S = {
-  CHOOSING:    'choosing',
-  QUESTION:    'question',
-  PIE_INTRO:   'pie_intro',
-  PIE:         'pie',
-  PIE_WIN:     'pie_win',     // splashy wedge celebration
-  STEAL:       'steal',
-  FINAL_PICK:  'final_pick',
-  FINAL:       'final',
-  WINNER:      'winner',
+  CHOOSING:         'choosing',
+  CAT_SPLASH:       'cat_splash',   // category reveal animation while audio pre-fetches
+  QUESTION:         'question',
+  PIE_INTRO:        'pie_intro',
+  PIE:              'pie',
+  PIE_WIN:          'pie_win',
+  STEAL:            'steal',
+  FINAL_PICK:       'final_pick',
+  FINAL:            'final',
+  WINNER:           'winner',
 };
 
 // ─── PIE INTRO ANIMATION ───────────────────────────────────────────────────
@@ -417,6 +418,64 @@ function PieWinCelebration({ category, teamIdx, onDone }) {
     </div>
   );
 }
+// ─── CATEGORY SPLASH ──────────────────────────────────────────────────────
+function CategorySplash({ category, teamIdx, onReady }) {
+  const color = CAT_COLORS[category];
+  const team  = TEAMS[teamIdx];
+  const [step, setStep] = useState(0);
+
+  useEffect(() => {
+    const t1 = setTimeout(() => setStep(1), 150);
+    const t2 = setTimeout(() => setStep(2), 500);
+    const t3 = setTimeout(onReady, 1500);
+    return () => [t1, t2, t3].forEach(clearTimeout);
+  }, [onReady]);
+
+  return (
+    <div style={{
+      width:'100%', maxWidth:540,
+      borderRadius:12, overflow:'hidden',
+      border:`2px solid ${color}55`,
+      background:`${color}10`,
+      display:'flex', flexDirection:'column',
+      alignItems:'center', justifyContent:'center',
+      padding:'32px 20px', gap:10, minHeight:160,
+    }}>
+      <style>{`
+        @keyframes splashEmoji { 0%{transform:scale(0.4) rotate(-10deg);opacity:0} 70%{transform:scale(1.15) rotate(3deg)} 100%{transform:scale(1) rotate(0deg);opacity:1} }
+        @keyframes splashTitle { 0%{transform:translateY(12px);opacity:0} 100%{transform:translateY(0);opacity:1} }
+        @keyframes splashTeam  { 0%{opacity:0} 100%{opacity:1} }
+      `}</style>
+
+      <div style={{
+        fontSize:64, opacity:0,
+        filter:`drop-shadow(0 0 16px ${color}88)`,
+        animation:'splashEmoji 0.45s cubic-bezier(0.34,1.56,0.64,1) forwards',
+      }}>
+        {CAT_EMOJI[category]}
+      </div>
+
+      {step >= 1 && (
+        <div style={{
+          fontSize:22, fontWeight:900, color,
+          textAlign:'center', animation:'splashTitle 0.3s ease forwards',
+        }}>
+          {category}
+        </div>
+      )}
+
+      {step >= 2 && (
+        <div style={{
+          fontSize:11, color:team.color, fontFamily:'monospace', letterSpacing:2,
+          animation:'splashTeam 0.3s ease forwards',
+        }}>
+          {team.emoji} {team.label.toUpperCase()}'S QUESTION
+        </div>
+      )}
+    </div>
+  );
+}
+
 function PieWedge({ color, emoji, size = 160 }) {
   const cx = size / 2, cy = size / 2, r = size / 2 - 8;
   const startAngle = -Math.PI / 2;
@@ -649,20 +708,19 @@ export default function Game() {
 
   // Team picks a category from the choosing screen
   const handlePickCategory = async (cat) => {
-    getAudio(); // unlock audio context on user tap
+    getAudio();
     setLoading(true); setError(null); setChosenCat(cat);
     setRevealed(false); setSpeaking(false); stopTTS();
     try {
       const catStreak = streak[active][cat] || 0;
       const isPieTurn = catStreak >= STREAK_NEEDED && !wedges[active].includes(cat);
 
-      // Fetch question first so we have the text
+      // Fetch question and start pre-fetching TTS audio simultaneously
       const data = await getQuestion(cat, isPieTurn);
       setQuestion(data.question);
       setRevealed(false);
 
-      // Immediately start pre-fetching TTS audio in background
-      // Store the promise so the auto-speak useEffect can await it
+      // Start pre-fetching audio immediately
       const BASE = process.env.REACT_APP_API_URL || '';
       pendingAudioRef.current = fetch(`${BASE}/api/tts`, {
         method: 'POST',
@@ -678,11 +736,17 @@ export default function Game() {
         playPieSting(getAudio());
         setState(S.PIE_INTRO);
       } else {
-        setState(S.QUESTION);
+        // Show category splash while audio pre-fetches
+        setState(S.CAT_SPLASH);
       }
     } catch (e) { setError(e.message); }
     finally { setLoading(false); }
   };
+
+  // Called when category splash finishes — show the question
+  const handleSplashDone = useCallback(() => {
+    setState(S.QUESTION);
+  }, []);
 
   // Called when pie intro animation finishes — ensure revealed is false
   const handlePieIntroDone = useCallback(() => {
@@ -1047,6 +1111,11 @@ export default function Game() {
             })}
           </div>
         </div>
+      )}
+
+      {/* ── CATEGORY SPLASH — shows while audio pre-fetches ── */}
+      {state === S.CAT_SPLASH && chosenCat && (
+        <CategorySplash category={chosenCat} teamIdx={active} onReady={handleSplashDone} />
       )}
 
       {/* ── CHOOSING ── */}
