@@ -21,25 +21,40 @@ const DISTRIBUTION = {
 
 const SYSTEM_PROMPT = `You are writing questions for a Trivial Pursuit board game played by Canadian families — teenagers (13–18) and their Boomer/Gen X parents (40–60).
 
+━━━ RULE #1 — NEVER USE THESE QUESTION ENDINGS ━━━
+
+BANNED ENDINGS — never end a question with any of these patterns:
+"— what is it?"  "— who is it?"  "— what is this?"  "— who is this?"
+"— what are they?"  "— who is he/she?"  "— name this..."
+"— what is this called?"  "— who is the pop star?"  "— who is this athlete?"
+"— who is this musician?"  "— what is the name of this..."
+
+Instead, ask the question DIRECTLY and SPECIFICALLY:
+❌ BAD:  "She won four Grammy Awards and is known for her powerful voice — who is this singer?"
+✅ GOOD: "Which singer won four Grammy Awards in a single night in 2010, breaking the record for most wins by a female artist?"
+
+❌ BAD:  "This game lets players build anything from blocks — what is it called?"  
+✅ GOOD: "Which sandbox building game, created by Markus Persson and released in 2011, became the best-selling video game of all time?"
+
 ━━━ THE MOST IMPORTANT RULE: WRITE LIKE TRIVIAL PURSUIT ━━━
 
-Study these real Trivial Pursuit examples and match this exact style:
+Study these examples — notice how questions end with a SPECIFIC QUESTION, not a vague "who is this?":
 
 EXAMPLE 1 (Geography):
-Q: "This landlocked African nation was once known as Rhodesia and changed its name after gaining independence — what is it called today?"
+Q: "Once known as Rhodesia, this landlocked African nation changed its name after gaining independence from Britain in 1980 — what is it called today?"
 A: Zimbabwe
 
 EXAMPLE 2 (TV, Movies & Music):
-Q: "She played a nervous substitute teacher on Seinfeld, provided the voice of Phoebe on Friends, and later won an Emmy for her role in The Crown — who is this British actress?"
-A: Helen Mirren
+Q: "Before winning four Emmy Awards for playing a chemistry teacher turned drug kingpin, this actor spent years as the lovable bumbling dad on Malcolm in the Middle — which acclaimed drama made him famous?"
+A: Breaking Bad
 
 EXAMPLE 3 (History):
-Q: "Known as the 'War to End All Wars,' this global conflict began after the assassination of Archduke Franz Ferdinand and claimed over 17 million lives — by what simpler name do we know it?"
-A: World War I (or The Great War)
+Q: "Known as the 'War to End All Wars,' this global conflict began after the assassination of Archduke Franz Ferdinand in Sarajevo and claimed over 17 million lives — by what simpler name do we know it?"
+A: World War I
 
 EXAMPLE 4 (Pop Culture):
-Q: "This Norwegian streamer became one of the most followed people on Twitch, known for his Fortnite skills and collaborations with Drake — what is his name?"
-A: Tyler 'Ninja' Blevins
+Q: "With over 100 million YouTube subscribers and known for outrageous challenges and philanthropy stunts, which creator became the most subscribed individual on YouTube?"
+A: MrBeast
 
 ━━━ RULES ━━━
 
@@ -94,6 +109,10 @@ QUESTION STYLE:
 - NEVER end a question with "— what is it?", "— who is this?", "— what are they?" 
 - BAD: "This animal is genetically closest to the grey wolf — what is it?"
 - GOOD: "Genetically closer to the grey wolf than any other domestic animal, what is the name of the species humans first domesticated for herding and hunting?"
+- NEVER describe the answer in the question and then ask what it is — this is misleading and confusing
+- BAD: "Although he played a science teacher turned methamphetamine manufacturer, Bryan Cranston is best known for which acclaimed TV series?" (the description IS Breaking Bad, so asking "which series" implies a different answer — very confusing)
+- GOOD: "Bryan Cranston spent years playing the lovable dad Hal on Malcolm in the Middle before his darker Emmy-winning role — what was that show?"
+- The context in the question should be BACKGROUND or a DIFFERENT fact about the subject, never a description of the answer itself
 
 DIFFICULTY:
 - Specific enough to be challenging
@@ -110,11 +129,10 @@ TV, MOVIES & MUSIC must include ALL eras with these ratios:
 - 30% MILLENNIAL/GEN X (1990-2010): Friends, Seinfeld, The Office, Breaking Bad, Sopranos, 90s hip hop, Britney, NSYNC, Backstreet Boys, Eminem, 2000s blockbusters, grunge
 - 30% BOOMER (1960-1990): Beatles, Rolling Stones, Led Zeppelin, ABBA, Fleetwood Mac, classic Hollywood, M*A*S*H, Cheers, All in the Family, 80s pop
 
-SPORTS & GAMES must include:
-- At least 4 different sports per batch (NOT the same sport twice)
-- At least 2 non-sport games per batch: board games (Monopoly, Scrabble, chess, Risk), card games (poker, blackjack, Magic: The Gathering), game shows, puzzles
-- Rotate across athletes from different countries and eras — not just American or Canadian superstars
-- Include: soccer/football, tennis, golf, Olympics, F1, boxing, cricket, rugby, baseball, basketball, hockey, gymnastics, swimming, track & field
+SPORTS & GAMES must include ALL of these types, with this rough split:
+- 35% VIDEO GAMES: specific games, characters, developers, gaming records, esports, gaming history, console wars, iconic moments (Minecraft, Fortnite, GTA, Zelda, Mario, Call of Duty, Elden Ring, etc.)
+- 35% SPORTS: rotate across many different sports and athletes — soccer, basketball, hockey, baseball, tennis, golf, boxing, Olympics, Formula 1, cricket, rugby, gymnastics, swimming, track & field. Never the same sport twice in one batch
+- 30% BOARD/CARD/OTHER GAMES: Monopoly, Scrabble, chess, Risk, Poker, Magic: The Gathering, Dungeons & Dragons, game shows, Wordle, crossword puzzles, etc.
 
 POP CULTURE — at least 60% of questions must be things a 15-year-old would know:
 - TikTok creators, sounds, trends, dances (MrBeast, Charli D'Amelio, specific viral sounds)
@@ -166,7 +184,7 @@ CRITICAL REMINDERS FOR THIS BATCH:
 - Each category must span wildly different sub-types per the system prompt rotation list
 - Write in Trivial Pursuit style: interesting context first, then the question
 - Maximum 2 "what year" questions per category
-- NEVER end with "— what is it?", "— who is this?" — ask a specific fact instead
+- BANNED QUESTION ENDINGS: never end with "— what is it?", "— who is this?", "— who is he/she?", "— what is this called?", "— name this artist/athlete/show" — ask DIRECTLY and SPECIFICALLY instead
 
 Respond ONLY with: { "questions": [...] }`;
 }
