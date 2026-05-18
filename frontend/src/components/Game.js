@@ -84,6 +84,31 @@ function playStealSting(ctx) {
   osc.start(t + 0.55); osc.stop(t + 1.2);
 }
 
+// 🎉 Correct answer — cheerful upbeat ding
+function playCorrect(ctx) {
+  if (!ctx) return;
+  const t = ctx.currentTime;
+  // Quick happy two-note ding
+  playTone(ctx, 523, t,        0.12, 'sine', 0.25);
+  playTone(ctx, 784, t + 0.12, 0.2,  'sine', 0.22);
+  playTone(ctx, 1047,t + 0.28, 0.25, 'sine', 0.18);
+}
+
+// 🔊 Text-to-speech helpers
+function speakText(text) {
+  if (!window.speechSynthesis) return;
+  window.speechSynthesis.cancel(); // stop any current speech
+  const utterance = new SpeechSynthesisUtterance(text);
+  utterance.rate  = 0.92;  // slightly slower for clarity
+  utterance.pitch = 1.0;
+  utterance.volume = 1.0;
+  window.speechSynthesis.speak(utterance);
+}
+
+function stopSpeaking() {
+  if (window.speechSynthesis) window.speechSynthesis.cancel();
+}
+
 // ─── CONSTANTS ─────────────────────────────────────────────────────────────
 const STREAK_NEEDED = 2;
 const TEAMS = [
@@ -309,6 +334,7 @@ export default function Game() {
   const [error,      setError]      = useState(null);
   const [flash,      setFlash]      = useState(null);
   const [winner,     setWinner]     = useState(null);
+  const [speaking,   setSpeaking]   = useState(false);
   // finalTeam = team that has all wedges and needs final question
   const [finalTeam,     setFinalTeam]     = useState(null);
   // categories already used for final question attempts — can't be picked again
@@ -331,6 +357,21 @@ export default function Game() {
 
   useEffect(() => { loadCategoryOptions(0, [[], []]); }, [loadCategoryOptions]);
 
+  // Auto-read question aloud whenever a new question loads
+  useEffect(() => {
+    if (question && question.question) {
+      setSpeaking(true);
+      stopSpeaking();
+      const u = new SpeechSynthesisUtterance(question.question);
+      u.rate   = 0.92;
+      u.pitch  = 1.0;
+      u.volume = 1.0;
+      u.onend  = () => setSpeaking(false);
+      u.onerror = () => setSpeaking(false);
+      window.speechSynthesis?.speak(u);
+    }
+  }, [question]);
+
   const triggerFlash = (type) => {
     setFlash(type);
     setTimeout(() => setFlash(null), 600);
@@ -348,7 +389,7 @@ export default function Game() {
   const handlePickCategory = async (cat) => {
     getAudio(); // unlock audio context on user tap
     setLoading(true); setError(null); setChosenCat(cat);
-    setRevealed(false); // always reset revealed when picking new category
+    setRevealed(false); setSpeaking(false); stopSpeaking();
     try {
       const catStreak = streak[active][cat] || 0;
       const isPieTurn = catStreak >= STREAK_NEEDED && !wedges[active].includes(cat);
@@ -394,7 +435,9 @@ export default function Game() {
 
   const handleCorrect = async () => {
     await consumeQuestion();
+    stopSpeaking(); setSpeaking(false);
     triggerFlash('correct');
+    playCorrect(getAudio());
     const newScores = [...scores];
     newScores[active] += 1;
     setScores(newScores);
@@ -438,6 +481,7 @@ export default function Game() {
 
   const handleWrong = async () => {
     await consumeQuestion();
+    stopSpeaking(); setSpeaking(false);
     triggerFlash('wrong');
     setStreak(prev => { const n=[...prev]; n[active]={...n[active],[chosenCat]:0}; return n; });
 
@@ -460,6 +504,7 @@ export default function Game() {
 
   const handleSkip = async () => {
     await consumeQuestion();
+    stopSpeaking(); setSpeaking(false);
     await loadCategoryOptions(active, wedges);
   };
 
@@ -482,6 +527,8 @@ export default function Game() {
   };
 
   const handleStealWrong = async () => {
+    // Both teams got it wrong — reset original team's streak for this category
+    setStreak(prev => { const n=[...prev]; n[active]={...n[active],[chosenCat]:0}; return n; });
     const nextTeam = 1 - active;
     setActive(nextTeam);
     await loadCategoryOptions(nextTeam, wedges);
@@ -654,6 +701,24 @@ export default function Game() {
           </div>
           <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
             {catOptions.filter(Boolean).map(cat => {
+              // Roll Again special button
+              if (cat === 'ROLL_AGAIN') {
+                return (
+                  <button key="ROLL_AGAIN" onClick={() => loadCategoryOptions(active, wedges)} disabled={loading} style={{
+                    padding:'22px 24px', borderRadius:12,
+                    border:'2px solid #22c55e55',
+                    background:'#22c55e10',
+                    color:'#fff', cursor:'pointer', textAlign:'left',
+                    display:'flex', alignItems:'center', gap:16,
+                  }}>
+                    <span style={{ fontSize:36 }}>🎲</span>
+                    <div>
+                      <div style={{ fontSize:20, fontWeight:700, color:'#22c55e' }}>Roll Again!</div>
+                      <div style={{ fontSize:13, color:'#555', fontFamily:'monospace', marginTop:4 }}>tap to get two new categories</div>
+                    </div>
+                  </button>
+                );
+              }
               const alreadyOwned = wedges[active].includes(cat);
               const streakInCat  = streak[active][cat] || 0;
               const pieReady     = streakInCat >= STREAK_NEEDED && !alreadyOwned;
@@ -693,6 +758,39 @@ export default function Game() {
             <div style={{ fontSize:9, color: state===S.FINAL ? '#fbbf24' : isPieState?'#fbbf24':catData?.color, fontFamily:'monospace', letterSpacing:2, textTransform:'uppercase' }}>
               {state===S.FINAL ? '🏆 FINAL QUESTION' : isPieState ? '🥧 PIE QUESTION' : `${catData?.emoji} ${chosenCat}`}
             </div>
+            <div style={{ display:'flex', gap:8, alignItems:'center' }}>
+              {/* Stop / Replay button */}
+              <button
+                onClick={() => {
+                  if (speaking) {
+                    stopSpeaking(); setSpeaking(false);
+                  } else {
+                    setSpeaking(true);
+                    stopSpeaking();
+                    const u = new SpeechSynthesisUtterance(question.question);
+                    u.rate = 0.92; u.pitch = 1.0; u.volume = 1.0;
+                    u.onend = () => setSpeaking(false);
+                    u.onerror = () => setSpeaking(false);
+                    window.speechSynthesis?.speak(u);
+                  }
+                }}
+                title={speaking ? 'Stop reading' : 'Read again'}
+                style={{
+                  padding:'4px 10px', borderRadius:5,
+                  border:`1px solid ${speaking ? '#ef4444' : '#333'}`,
+                  background: speaking ? 'rgba(239,68,68,0.1)' : 'transparent',
+                  color: speaking ? '#ef4444' : '#555',
+                  cursor:'pointer', fontSize:16, lineHeight:1,
+                }}
+              >{speaking ? '🔇' : '🔁'}</button>
+              {question.canadian && <div style={{ fontSize:8, color:'#cc000099', fontFamily:'monospace' }}>🍁</div>}
+              {!isPieState && state !== S.FINAL && (
+                <button onClick={handleSkip} disabled={loading} style={{ padding:'2px 8px', borderRadius:3, border:'1px solid #222', background:'transparent', color:'#333', cursor:'pointer', fontSize:9, fontFamily:'monospace' }}>
+                  SKIP
+                </button>
+              )}
+            </div>
+          </div>
             <div style={{ display:'flex', gap:8, alignItems:'center' }}>
               {question.canadian && <div style={{ fontSize:8, color:'#cc000099', fontFamily:'monospace' }}>🍁</div>}
               {!isPieState && (
