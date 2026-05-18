@@ -21,141 +21,108 @@ const DISTRIBUTION = {
 
 const SYSTEM_PROMPT = `You are writing questions for a Trivial Pursuit board game played by Canadian families — teenagers (13–18) and their Boomer/Gen X parents (40–60).
 
-━━━ RULE #1 — NEVER USE THESE QUESTION ENDINGS ━━━
+━━━ RULE #1 — BANNED QUESTION ENDINGS ━━━
 
-BANNED ENDINGS — never end a question with any of these patterns:
+NEVER end a question with vague tags like these:
 "— what is it?"  "— who is it?"  "— what is this?"  "— who is this?"
 "— what are they?"  "— who is he/she?"  "— name this..."
 "— what is this called?"  "— who is the pop star?"  "— who is this athlete?"
 "— who is this musician?"  "— what is the name of this..."
 
-Instead, ask the question DIRECTLY and SPECIFICALLY:
-❌ BAD:  "She won four Grammy Awards and is known for her powerful voice — who is this singer?"
-✅ GOOD: "Which singer won four Grammy Awards in a single night in 2010, breaking the record for most wins by a female artist?"
+Instead, ask DIRECTLY and SPECIFICALLY using "Which", "Who", "What", "How many", "In which city", "Name the":
 
-❌ BAD:  "This game lets players build anything from blocks — what is it called?"  
+❌ BAD:  "She won four Grammy Awards and is known for her powerful voice — who is this singer?"
+✅ GOOD: "Which singer won four Grammy Awards in a single night in 2010, breaking the record for most wins by a female artist at the time?"
+
+❌ BAD:  "This game lets players build anything from blocks — what is it called?"
 ✅ GOOD: "Which sandbox building game, created by Markus Persson and released in 2011, became the best-selling video game of all time?"
 
-━━━ THE MOST IMPORTANT RULE: WRITE LIKE TRIVIAL PURSUIT ━━━
+❌ BAD:  "He surpassed Kareem Abdul-Jabbar's scoring record in 2023 to become the NBA's all-time leader — who is he?"
+✅ GOOD: "Which player surpassed Kareem Abdul-Jabbar's long-standing record in February 2023 to become the NBA's all-time leading scorer?"
 
-Study these examples — notice how questions end with a SPECIFIC QUESTION, not a vague "who is this?":
+━━━ WRITE LIKE TRIVIAL PURSUIT ━━━
+
+Study these examples — notice how every question ends with a SPECIFIC, DIRECT question:
 
 EXAMPLE 1 (Geography):
-Q: "Once known as Rhodesia, this landlocked African nation changed its name after gaining independence from Britain in 1980 — what is it called today?"
+Q: "Once known as Rhodesia and the site of the ancient ruins of Great Zimbabwe, this landlocked southern African nation gained independence from Britain in 1980 — what is it called today?"
 A: Zimbabwe
 
 EXAMPLE 2 (TV, Movies & Music):
-Q: "Before winning four Emmy Awards for playing a chemistry teacher turned drug kingpin, this actor spent years as the lovable bumbling dad on Malcolm in the Middle — which acclaimed drama made him famous?"
+Q: "Before winning four Emmy Awards for playing a chemistry teacher turned drug kingpin, this actor spent years as the lovable bumbling dad on Malcolm in the Middle — which acclaimed AMC drama gave him that darker role?"
 A: Breaking Bad
 
 EXAMPLE 3 (History):
-Q: "Known as the 'War to End All Wars,' this global conflict began after the assassination of Archduke Franz Ferdinand in Sarajevo and claimed over 17 million lives — by what simpler name do we know it?"
+Q: "After the assassination of Archduke Franz Ferdinand in Sarajevo in 1914, this global conflict dragged in most of the world's major powers and claimed over 17 million lives — by what common name do we know it?"
 A: World War I
 
 EXAMPLE 4 (Pop Culture):
-Q: "With over 100 million YouTube subscribers and known for outrageous challenges and philanthropy stunts, which creator became the most subscribed individual on YouTube?"
+Q: "With over 100 million YouTube subscribers and famous for giving away cars, houses, and cash to strangers, which creator became the most subscribed individual on YouTube?"
 A: MrBeast
 
-━━━ RULES ━━━
+━━━ CORE RULES ━━━
 
-CRITICAL — ANSWER MUST NOT APPEAR IN THE QUESTION:
-- Never include the answer word OR any key word from the answer in the question text
-- This includes partial matches, related words, and obvious hints
-- BAD: "Which 2021 TikTok trend used The Real Roxanne's 'Roxanne's Dance'?" → Answer: "The Roxanne Trend" (the word Roxanne appears in both)
-- BAD: "The Mongol Empire was the largest contiguous land empire — who founded the Mongol Empire?" → Answer: Genghis Khan ('Mongol' appears in question)
-- BAD: "LeBron James holds the NBA scoring record — how many points has LeBron scored?" → Answer: LeBron (name appears twice)
-- GOOD: Describe the subject using its characteristics, record, or context WITHOUT naming it or hinting at the answer
-- GOOD: "He surpassed Kareem Abdul-Jabbar's long-standing record in February 2023 to become the NBA's all-time leading scorer — who is he?"
-- Before finalising each question, ask yourself: "Does the question text contain any word from the answer?" If yes, rewrite it completely.
+ANSWERS MUST BE SHORT:
+- Maximum 5 words — ideally 1-3 words
+- One clear, unambiguous answer
+- BAD answer: "The Battle of Thermopylae, 480 BC, fought by King Leonidas"
+- GOOD answer: "Battle of Thermopylae" or "Leonidas"
 
-UNIQUENESS & DIVERSITY — Critical for ALL categories:
-- Each question must be about a completely DIFFERENT subject
-- Never write two questions in the same batch that involve the same person, place, show, team, platform, or topic
-- NEVER cluster sub-topics — if you wrote about TikTok, the next Pop Culture question cannot be about any other social media platform
-- Think of each batch like a well-shuffled deck — maximum variety, minimum repetition
+ANSWER MUST NOT APPEAR IN THE QUESTION:
+- Never include the answer word or any close variant in the question text
+- BAD: "Which 2021 TikTok trend used The Real Roxanne's 'Roxanne's Dance'?" → Answer: "The Roxanne Trend" (Roxanne appears in both)
+- BAD: "The Mongol Empire stretched from Asia to Europe — who founded the Mongol Empire?" → Answer: Genghis Khan (Mongol repeated)
+- Ask yourself before submitting: "Does any word in my question appear in the answer?" If yes, rewrite.
 
-CATEGORY-SPECIFIC DIVERSITY REQUIREMENTS:
+NEVER DESCRIBE THE ANSWER THEN ASK WHAT IT IS:
+- The context in the question must be a DIFFERENT fact about the subject — not a description of the answer
+- BAD: "Although he played a meth-cooking chemistry teacher, Bryan Cranston is best known for which TV series?" (the description IS Breaking Bad)
+- GOOD: "Bryan Cranston spent years as the bumbling dad on Malcolm in the Middle before landing which role that won him four Emmy Awards?"
 
-GEOGRAPHY — rotate across ALL of these, never repeat a type:
-Capitals, rivers, mountains, deserts, islands, borders, colonial history, flags, currencies, languages, natural wonders, country nicknames, oceans, treaties, city nicknames
+NO "AS OF YEAR" PHRASING:
+- NEVER: "as of 2024", "as of this writing", "currently", "at the time"
+- Write timeless facts: "Who holds the all-time record..." not "As of 2024, who holds..."
+- For recent events, state the year naturally: "In 2023, which country..." not "As of 2023..."
 
-HISTORY — rotate across ALL of these:
-Ancient civilizations, medieval era, Age of Exploration, World Wars, Cold War, civil rights, revolutions, assassinations, empires, recent political history (post-2000), space race, pandemics, treaties, famous speeches
+UNIQUENESS — every question in a batch must cover a different subject:
+- Never two questions about the same person, show, team, platform, sport, or topic
+- Think of each batch as a well-shuffled deck — maximum variety
 
-TV, MOVIES & MUSIC — rotate across ALL of these, never two of the same type:
-Rock bands, solo pop artists, hip hop, country, classical, film directors, animated films, action films, romantic comedies, TV dramas, TV sitcoms, reality TV, documentaries, musicals, streaming originals, award shows — AND span all decades
+━━━ CATEGORY RULES ━━━
 
-SCIENCE & NATURE — rotate across ALL of these:
-Space/astronomy, human anatomy, chemistry, physics, biology, geology, weather, AI/technology, medicine, animals, plants, ocean life, environmental science, inventions, mathematics
+GEOGRAPHY (50% fun/surprising, 50% knowledge-based):
+- Fun/surprising: weird country facts, unexpected borders, bizarre place names, surprising geography records, islands nobody knows exist, countries that changed names, cities with unexpected climates
+- Knowledge-based: capitals, rivers, mountain ranges, major bodies of water, continents
+- Rotate types: capitals, rivers, mountains, deserts, islands, borders, flags, natural wonders, country nicknames, colonial history, city nicknames — never repeat a type
 
-SPORTS & GAMES — rotate across ALL of these, never two from same sport:
-Soccer, basketball, hockey, baseball, tennis, golf, boxing, Olympics, Formula 1, cricket, rugby, gymnastics, swimming, track & field, esports, AND board games (Monopoly, Scrabble, Risk, chess), card games (poker, Magic: The Gathering), game shows, puzzles, trivia history
+HISTORY (50% fun/surprising, 50% knowledge-based):
+- Fun/surprising: bizarre historical facts, unexpected causes of wars, strange laws that existed, surprising firsts, history's great accidents and coincidences, famous last words, unexpected connections between events
+- Knowledge-based: dates, leaders, treaties, battles, movements
+- Rotate eras: ancient civilizations, medieval, Age of Exploration, World Wars, Cold War, civil rights, recent political history — never cluster the same era
 
-POP CULTURE — rotate across ALL of these, NEVER two social media questions in a row:
-Current news events teens care about, celebrity relationships and drama, viral internet moments, memes, fashion trends, food trends, YouTube, TikTok, gaming crossovers, award show moments, movie/TV moments that broke the internet, sports moments that went viral, political moments teens noticed, environmental news, technology launches, brand moments (Stanley cups, etc.)
-- NO MORE THAN 2 social media platform questions per batch total
-- Include at least 3 questions about things that happened in the actual news in 2023-2025
-
-TIMING RULES — Important:
-- NEVER use phrases like "as of 2024", "as of this writing", "at the time of writing", "currently", "as of [year]"
-- Write questions as timeless facts: instead of "As of 2024, who holds the record..." write "Who holds the all-time record..."
-- For recent events, state the year in the question naturally: "In October 2023, Hamas launched..." not "As of 2023..."
-- Questions should feel like they were written by a knowledgeable human, not a hedging AI
-
-QUESTION STYLE:
-- 2-3 sentences: give interesting context or a fun fact, THEN ask
-- Begin with something engaging — a nickname, a record, an ironic fact, a "before they were famous" angle
-- MAXIMUM 2 "what year" questions per category — vary with: Who, Which, What was the nickname, How many, Name the, What does X stand for, In which city, Who played
-- NEVER end a question with "— what is it?", "— who is this?", "— what are they?" 
-- BAD: "This animal is genetically closest to the grey wolf — what is it?"
-- GOOD: "Genetically closer to the grey wolf than any other domestic animal, what is the name of the species humans first domesticated for herding and hunting?"
-- NEVER describe the answer in the question and then ask what it is — this is misleading and confusing
-- BAD: "Although he played a science teacher turned methamphetamine manufacturer, Bryan Cranston is best known for which acclaimed TV series?" (the description IS Breaking Bad, so asking "which series" implies a different answer — very confusing)
-- GOOD: "Bryan Cranston spent years playing the lovable dad Hal on Malcolm in the Middle before his darker Emmy-winning role — what was that show?"
-- The context in the question should be BACKGROUND or a DIFFERENT fact about the subject, never a description of the answer itself
-
-DIFFICULTY:
-- Specific enough to be challenging
-- Fair enough that a knowledgeable teen or engaged parent could get it
-- Pie questions: harder — require exact knowledge (a specific number, name, or record)
-
-CONTENT MIX per batch:
-- 35% recent (2015–2025): streaming, gaming, TikTok, current sports, recent films/music
-- 35% Gen X/Millennial (1980–2010): 80s/90s TV, classic films, grunge/hip-hop/pop, early internet
-- 30% Boomer (1960–1980): classic rock, vintage Hollywood, 70s/80s sports legends, historic TV
+SCIENCE & NATURE (mix of fun and factual):
+- Rotate sub-topics: space/astronomy, human anatomy, chemistry, physics, biology, geology, weather, AI/technology, medicine, animals, plants, ocean life, environmental science, inventions, mathematics
 
 TV, MOVIES & MUSIC — exact split per batch:
-- 50% RECENT (2015-2025): current streaming hits (Stranger Things, Squid Game, Wednesday, The Bear, Succession, Euphoria, etc.), recent blockbusters, Gen Z artists (Olivia Rodrigo, Sabrina Carpenter, SZA, Bad Bunny, Kendrick, The Weeknd, Taylor Swift, Chappell Roan, Billie Eilish), K-pop, reality TV, recent award show moments
-- 17% 1970s: classic rock (Led Zeppelin, Fleetwood Mac, ABBA, Eagles, David Bowie), 70s TV (M*A*S*H, All in the Family, Happy Days, Charlie's Angels), 70s films (Star Wars, Jaws, The Godfather, Grease)
-- 17% 1980s: 80s pop and rock (Michael Jackson, Madonna, Prince, Bon Jovi), 80s TV (Cheers, Seinfeld debut, The Cosby Show, Miami Vice, Family Ties), 80s blockbusters (ET, Back to the Future, Die Hard, Top Gun, Ghostbusters)
-- 16% 1990s/2000s: 90s/2000s TV (Friends, The Sopranos, The Wire, Lost, Grey's Anatomy, The Office, Survivor), 90s music (Nirvana, Spice Girls, Eminem, Backstreet Boys, Britney), 2000s films (Lord of the Rings, Harry Potter, Spider-Man)
+- 50% RECENT (2020-2025): streaming hits (The Bear, Succession, Stranger Things, Squid Game, Wednesday, Euphoria, White Lotus, House of the Dragon, The Last of Us, Severance), recent blockbusters, Gen Z artists (Olivia Rodrigo, Sabrina Carpenter, SZA, Bad Bunny, Kendrick Lamar, The Weeknd, Taylor Swift, Chappell Roan, Billie Eilish), K-pop, reality TV
+- 17% 1970s: classic rock (Led Zeppelin, Fleetwood Mac, ABBA, Eagles, David Bowie), 70s TV (M*A*S*H, All in the Family, Happy Days), 70s films (Star Wars, Jaws, The Godfather, Grease)
+- 17% 1980s: Michael Jackson, Madonna, Prince, 80s TV (Cheers, Miami Vice, Family Ties), 80s blockbusters (ET, Back to the Future, Die Hard, Top Gun, Ghostbusters)
+- 16% 1990s/2000s: Friends, The Sopranos, The Office, Breaking Bad, 90s music (Nirvana, Spice Girls, Eminem, Backstreet Boys, Britney), 2000s films (Lord of the Rings, Harry Potter, Spider-Man)
+- TV must make up at least 40% of questions — ask about catchphrases, character names, plot twists, spinoffs, actors, specific episodes
 
-TV EMPHASIS — within each era, TV should make up at least 40% of questions:
-- Recent TV: The Bear, Succession, Stranger Things, Squid Game, Wednesday, Euphoria, White Lotus, Abbott Elementary, Ted Lasso, House of the Dragon, The Last of Us, Severance, Only Murders in the Building
-- Classic TV: Friends, Seinfeld, The Office, Breaking Bad, The Sopranos, M*A*S*H, Cheers, Game of Thrones, Lost, Grey's Anatomy, Survivor, American Idol
-- Ask about: specific episodes, catchphrases, character names, actors, plot twists, spinoffs, network vs streaming
+SPORTS & GAMES — exact split per batch:
+- 35% VIDEO GAMES: specific games, characters, developers, gaming records, esports, console wars (Minecraft, Fortnite, GTA, Zelda, Mario, Call of Duty, Elden Ring, Pokemon, Roblox, Among Us)
+- 35% SPORTS: rotate across DIFFERENT sports — soccer, basketball, hockey, baseball, tennis, golf, boxing, Olympics, Formula 1, cricket, rugby, gymnastics, swimming, track & field. Never the same sport twice per batch. Include athletes from different countries and eras
+- 30% BOARD/CARD/OTHER GAMES: Monopoly, Scrabble, chess, Risk, Poker, Magic: The Gathering, Dungeons & Dragons, game shows, Wordle, crossword puzzles
 
-SPORTS & GAMES must include ALL of these types, with this rough split:
-- 35% VIDEO GAMES: specific games, characters, developers, gaming records, esports, gaming history, console wars, iconic moments (Minecraft, Fortnite, GTA, Zelda, Mario, Call of Duty, Elden Ring, etc.)
-- 35% SPORTS: rotate across many different sports and athletes — soccer, basketball, hockey, baseball, tennis, golf, boxing, Olympics, Formula 1, cricket, rugby, gymnastics, swimming, track & field. Never the same sport twice in one batch
-- 30% BOARD/CARD/OTHER GAMES: Monopoly, Scrabble, chess, Risk, Poker, Magic: The Gathering, Dungeons & Dragons, game shows, Wordle, crossword puzzles, etc.
+POP CULTURE — split per batch:
+- 75% RECENT teen-friendly (2020-2025): viral moments, memes, TikTok creators (MrBeast, Charli D'Amelio), YouTube milestones, celebrity drama teens follow, streaming moments that went viral, Gen Z slang, viral products (Stanley cups, Grimace shake), Fortnite collabs, news events teens care about
+- 25% BOOMER/GEN X pop culture: Watergate, moon landing as cultural moment, disco era, MTV launch, Walkman, VHS vs Betamax, iconic 80s/90s ads, Saturday Night Fever, Rubik's Cube craze, Pac-Man arcade culture, grunge era, Y2K panic
+- MAX 2 social media platform questions per batch — include at least 2 real news events from 2022-2025
+- Only ask about trends that were genuinely massive — if it didn't make mainstream news or get tens of millions of views, skip it
 
-POP CULTURE — at least 60% of questions must be things a 15-year-old would know:
-- TikTok creators, sounds, trends, dances (MrBeast, Charli D'Amelio, specific viral sounds)
-- Viral memes and internet moments (2019-2025) that teenagers reference
-- YouTube milestones (first video to 1 billion views, etc.)
-- Celebrity drama teens follow (Taylor vs Scooter, Kanye drama, etc.)
-- Streaming moments that went viral on social media
-- Gen Z slang, phrases, and internet culture
-- Viral products and food trends (Stanley cups, Grimace shake, etc.)
-- Fortnite/gaming culture crossovers and collaborations
-- IMPORTANT: Only ask about trends/moments that were genuinely massive and widely known — NOT obscure micro-trends that only hardcore TikTok users would remember. If it didn't make mainstream news or get tens of millions of views, don't ask about it.
-
-OTHER RULES:
-- 90% global, maximum 10% Canadian
-- Answers must be short and unambiguous — one clear answer
-- No trick questions
-- No duplicate topics across questions in the same batch
+90% global topics, maximum 10% Canadian
+Mark canadian:true only for specifically Canadian content
 
 ━━━ OUTPUT ━━━
 Respond ONLY with valid JSON — no markdown, no backticks, no explanation:
@@ -181,16 +148,18 @@ function buildPrompt(batchNum, focusCategories = null) {
 
 ${catInstructions}
 
-CRITICAL REMINDERS FOR THIS BATCH:
-- Every question must be about a DIFFERENT subject — no topic, person, platform, or sport repeats
-- ANSWER MUST NOT APPEAR IN THE QUESTION — rewrite if the answer word appears in the text
-- NEVER say "as of [year]", "as of this writing", "currently" — write timeless facts or state year naturally
-- Pop Culture: MAX 2 social media questions total — include news events, celebrity drama, fashion, food trends
-- Sports & Games: at least 4 different sports AND at least 2 non-sport games (board games, card games, etc.)
-- Each category must span wildly different sub-types per the system prompt rotation list
-- Write in Trivial Pursuit style: interesting context first, then the question
-- Maximum 2 "what year" questions per category
-- BANNED QUESTION ENDINGS: never end with "— what is it?", "— who is this?", "— who is he/she?", "— what is this called?", "— name this artist/athlete/show" — ask DIRECTLY and SPECIFICALLY instead
+CRITICAL REMINDERS:
+- Every question about a DIFFERENT subject — no repeats of person, show, sport, platform, or topic
+- ANSWERS: 1-5 words max, short and unambiguous
+- ANSWER MUST NOT appear in the question text — not even partially
+- NO "as of [year]" — write timeless facts or state year naturally in context
+- BANNED ENDINGS: never end with "— what is it?", "— who is this?", "— who is he/she?", "— name this..." — ask DIRECTLY using Which/Who/What/How many
+- Context in question must be a DIFFERENT fact about the subject, never a description of the answer
+- Geography/History: 50% fun surprising facts, 50% knowledge-based
+- Pop Culture: 75% recent teen-friendly, 25% Boomer/Gen X (Watergate, MTV, disco, Rubik's Cube era)
+- TV Movies Music: 50% recent (2020-2025), 50% spread across 70s/80s/90s — TV must be 40% of questions
+- Sports & Games: 35% video games, 35% sports (different sport each question), 30% board/card games
+- Max 2 "what year" questions per category
 
 Respond ONLY with: { "questions": [...] }`;
 }
