@@ -3,9 +3,45 @@ const router  = express.Router();
 const db      = require('./db');
 const { requireAuth, login } = require('./auth');
 const { checkAndRefillIfNeeded, refillBank, isRefilling } = require('./refill');
+const OpenAI  = require('openai');
+
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+
+const VALID_VOICES = ['alloy', 'echo', 'fable', 'onyx', 'nova', 'shimmer'];
 
 // ── Auth ──────────────────────────────────────────────────────────────────────
 router.post('/auth/login', login);
+
+// ── TTS ───────────────────────────────────────────────────────────────────────
+// POST /api/tts — convert text to speech using OpenAI TTS
+// Body: { text, voice }
+router.post('/tts', async (req, res) => {
+  const { text, voice = 'nova' } = req.body;
+  if (!text) return res.status(400).json({ error: 'text required' });
+  if (!process.env.OPENAI_API_KEY) return res.status(503).json({ error: 'TTS not configured' });
+
+  const safeVoice = VALID_VOICES.includes(voice) ? voice : 'nova';
+
+  try {
+    const mp3 = await openai.audio.speech.create({
+      model: 'tts-1',
+      voice: safeVoice,
+      input: text.slice(0, 4096), // max chars
+      speed: 0.95,
+    });
+
+    const buffer = Buffer.from(await mp3.arrayBuffer());
+    res.set({
+      'Content-Type':  'audio/mpeg',
+      'Content-Length': buffer.length,
+      'Cache-Control':  'no-cache',
+    });
+    res.send(buffer);
+  } catch (err) {
+    console.error('TTS error:', err.message);
+    res.status(500).json({ error: 'TTS failed' });
+  }
+});
 
 // ── Game API ──────────────────────────────────────────────────────────────────
 
