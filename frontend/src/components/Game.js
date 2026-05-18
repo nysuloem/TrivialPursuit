@@ -796,7 +796,10 @@ export default function Game() {
   const handlePieWinDone = useCallback(async () => {
     setPieWinCat(null);
     await loadCategoryOptions(active, wedges);
-  }, [active, wedges, loadCategoryOptions]); = async (cat) => {
+  }, [active, wedges, loadCategoryOptions]);
+
+  // Final question: opponent picks a category
+  const handleFinalCategoryPick = async (cat) => {
     setLoading(true); setError(null); setChosenCat(cat); setRevealed(false);
     setFinalUsedCats(prev => [...prev, cat]); // mark this category as used
     try {
