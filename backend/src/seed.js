@@ -1,22 +1,37 @@
 // Run with: node src/seed.js
-// Seeds the initial question bank with ~300 questions
+// Seeds the initial question bank with ~1000 questions
 require('dotenv').config();
-const { initDB, insertQuestions, getUnusedCount } = require('./db');
+const { initDB, getUnusedCount } = require('./db');
 const { refillBank } = require('./refill');
 
+const TARGET = 1000;
+
 async function seed() {
-  console.log('🌱 Seeding initial question bank via Claude AI...');
+  console.log(`🌱 Seeding question bank — target: ${TARGET} questions`);
   await initDB();
 
   const existing = await getUnusedCount();
-  if (existing > 0) {
-    console.log(`ℹ️  Bank already has ${existing} questions. Skipping seed.`);
-    console.log('   If you want to re-seed, clear the questions table first.');
+  console.log(`ℹ️  Bank currently has ${existing} questions`);
+
+  const needed = TARGET - existing;
+  if (needed <= 0) {
+    console.log('✅ Bank already at target. Nothing to do.');
     process.exit(0);
   }
 
-  // Use the same refill mechanism to seed
-  await refillBank();
+  console.log(`📝 Generating ${needed} more questions in batches of ~50...`);
+
+  // Run refill in batches until we hit the target
+  const batches = Math.ceil(needed / 50);
+  let added = 0;
+
+  const { insertQuestions } = require('./db');
+  const { refillBank: rb } = require('./refill');
+
+  // Use the refill mechanism — it handles batching
+  // Override REFILL_AMOUNT temporarily via env
+  process.env.REFILL_AMOUNT = String(needed);
+  await rb();
 
   const final = await getUnusedCount();
   console.log(`✅ Seed complete. Bank has ${final} questions.`);
