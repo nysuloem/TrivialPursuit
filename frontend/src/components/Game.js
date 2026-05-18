@@ -116,7 +116,7 @@ function DiceRollStart({ onRollComplete, getAudio }) {
   const [tieMessage, setTieMessage] = useState(false);
 
   const rollDie = (teamIdx) => {
-    const ctx = getAudio(); // Unlock and get audio context
+    const ctx = getAudio(); 
     if (rolling[teamIdx] || (rolls[0] !== null && rolls[1] !== null && !tieMessage)) return;
 
     setTieMessage(false);
@@ -145,7 +145,6 @@ function DiceRollStart({ onRollComplete, getAudio }) {
     }, 80);
   };
 
-  // Listen for when both teams finish rolling
   useEffect(() => {
     if (rolling[0] || rolling[1]) return;
     if (rolls[0] !== null && rolls[1] !== null) {
@@ -168,4 +167,93 @@ function DiceRollStart({ onRollComplete, getAudio }) {
   return (
     <div style={{ width: '100%', maxWidth: 480, textAlign: 'center', padding: 20, background: '#0d0d0d', borderRadius: 12, border: '1px solid #1c1c1c' }}>
       <div style={{ fontSize: 11, letterSpacing: 5, color: '#666', fontFamily: 'monospace', marginBottom: 6 }}>DETERMINE FIRST TURN</div>
-      <h2 style={{ fontSize:
+      <h2 style={{ fontSize: 24, color: '#fff', fontWeight: 900, margin: '0 0 20px 0', fontFamily: 'Georgia, serif' }}>🎲 ROLL FOR HIGHEST START</h2>
+      
+      {tieMessage && (
+        <div style={{ color: '#fbbf24', fontSize: 12, fontFamily: 'monospace', marginBottom: 16, animation: 'fadeIn 0.3s ease' }}>
+          ⚠️ IT'S A TIE! ROLL AGAIN!
+        </div>
+      )}
+
+      <div style={{ display: 'flex', gap: 16, marginBottom: 20 }}>
+        {TEAMS.map((t, i) => {
+          const hasRolled = rolls[i] !== null;
+          const isWinner = rolls[0] !== null && rolls[1] !== null && rolls[0] !== rolls[1] && ((i === 0 && rolls[0] > rolls[1]) || (i === 1 && rolls[1] > rolls[0]));
+          
+          return (
+            <div key={i} style={{
+              flex: 1, background: '#111', borderRadius: 10, padding: '20px 10px',
+              border: `1px solid ${isWinner ? t.color : '#1c1c1c'}`,
+              boxShadow: isWinner ? `0 0 15px ${t.color}33` : 'none',
+              transition: 'all 0.3s ease'
+            }}>
+              <div style={{ fontSize: 12, color: '#fff', fontFamily: 'monospace', marginBottom: 12 }}>{t.emoji} {t.label.toUpperCase()}</div>
+              
+              <div style={{
+                width: 64, height: 64, background: rolling[i] ? '#222' : hasRolled ? t.color : '#1a1a1a',
+                color: rolling[i] ? '#555' : hasRolled ? '#fff' : '#333',
+                margin: '0 auto 16px', borderRadius: 10, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: 32, fontWeight: 900, border: '1px solid #2a2a2a', fontFamily: 'monospace',
+                transform: rolling[i] ? 'rotate(20deg) scale(1.05)' : 'none', transition: 'all 0.1s ease'
+              }}>
+                {rolls[i] || '?'}
+              </div>
+
+              <button 
+                onClick={() => rollDie(i)} 
+                disabled={rolling[i] || (rolls[i] !== null && !tieMessage)}
+                style={{
+                  padding: '8px 16px', borderRadius: 6, border: `1px solid ${t.color}55`,
+                  background: rolling[i] ? '#111' : `${t.color}15`, color: t.color,
+                  cursor: rolling[i] || (rolls[i] !== null && !tieMessage) ? 'default' : 'pointer',
+                  fontSize: 10, fontFamily: 'monospace', width: '100%', opacity: rolls[i] !== null && !tieMessage ? 0.4 : 1
+                }}
+              >
+                {rolling[i] ? 'ROLLING...' : hasRolled && !tieMessage ? 'ROLLED' : '💥 ROLL DIE'}
+              </button>
+
+              {isWinner && (
+                <div style={{ color: t.color, fontSize: 9, fontFamily: 'monospace', marginTop: 10, letterSpacing: 1 }}>
+                  GOES FIRST!
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ─── PIE INTRO ANIMATION ───────────────────────────────────────────────────
+function PieIntro({ category, teamIdx, onDone }) {
+  const [step, setStep] = useState(0);
+  useEffect(() => {
+    const timers = [
+      setTimeout(() => setStep(1), 600),
+      setTimeout(() => setStep(2), 1800),
+      setTimeout(onDone, 2600),
+    ];
+    return () => timers.forEach(clearTimeout);
+  }, [onDone]);
+
+  const color = CAT_COLORS[category];
+  return (
+    <div style={{
+      position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.92)',
+      display: 'flex', flexDirection: 'column', alignItems: 'center',
+      justifyContent: 'center', gap: 20, zIndex: 100,
+      animation: 'fadeIn 0.3s ease',
+    }}>
+      <style>{`
+        @keyframes fadeIn  { from { opacity:0 } to { opacity:1 } }
+        @keyframes popIn   { from { transform:scale(0.4); opacity:0 } to { transform:scale(1); opacity:1 } }
+        @keyframes glow    { 0%,100% { text-shadow: 0 0 20px ${color} } 50% { text-shadow: 0 0 60px ${color}, 0 0 100px ${color} } }
+        @keyframes slideUp { from { transform:translateY(20px); opacity:0 } to { transform:translateY(0); opacity:1 } }
+      `}</style>
+
+      <div style={{
+        animation: step >= 0 ? 'popIn 0.5s cubic-bezier(0.34,1.56,0.64,1) forwards' : 'none',
+        opacity: 0,
+      }}>
+        <Pie
