@@ -9,122 +9,77 @@ const MIN_PER_CATEGORY = 50;
 
 let isRefilling = false;
 
+// Keeping your preferred weight distribution, totaling 54 regular + 6 pie questions per standard batch
 const DISTRIBUTION = {
-  'Geography':         { regular: 8,  pie: 1 },
-  'TV, Movies & Music':{ regular: 10, pie: 1 },
-  'History':           { regular: 8,  pie: 1 },
-  'Science & Nature':  { regular: 8,  pie: 1 },
-  'Sports & Games':    { regular: 10, pie: 1 },
-  'Pop Culture':       { regular: 10, pie: 1 },
+  'Geography':          { regular: 8,  pie: 1 },
+  'TV, Movies & Music': { regular: 10, pie: 1 },
+  'History':            { regular: 8,  pie: 1 },
+  'Science & Nature':   { regular: 8,  pie: 1 },
+  'Sports & Games':     { regular: 10, pie: 1 },
+  'Pop Culture':        { regular: 10, pie: 1 },
 };
 
 const SYSTEM_PROMPT = [
-  'You are writing questions for a Trivial Pursuit board game played by Canadian families',
-  '— teenagers (13-18) and their Boomer/Gen X parents (40-60).',
+  'You are an expert trivia writer crafting questions for a Canadian family board game styled after Trivial Pursuit.',
+  'The players span multiple generations: Teenagers (13-18), Parents/Gen X (40-50), and Boomers (60+).',
   '',
-  '=== RULE #1 — BANNED QUESTION ENDINGS ===',
+  '=== CRITICAL: MULTI-GENERATIONAL BALANCE ===',
+  '- TEEN APPEAL: Teenagers must feel heavily represented in "Pop Culture" and "TV, Movies & Music". Do not use obscure, hyper-niche TikTok inside jokes. Focus on mainstream Gen Z/Alpha juggernauts.',
+  '- PARENT/BOOMER APPEAL: Ensure Geography, History, and Science & Nature don\'t leave teens completely out, but lean heavily into established cultural literacy.',
+  '- THE BRIDGE PRINCIPLE: A great question provides enough context for an older person to guess a teen answer, and vice versa. (e.g., Mentioning a parent\'s legendary career when asking about their Gen Z influencer kid).',
   '',
-  'NEVER end a question with vague tags like:',
-  '"what is it?" "who is it?" "what is this?" "who is this?"',
-  '"what are they?" "who is he/she?" "name this..." "what is this called?"',
-  '"who is the pop star?" "who is this athlete?" "who is this musician?"',
+  '=== CRITICAL: RADICAL DIVERSITY (NO CLUSTERING) ===',
+  '- NEVER feature the same person, franchise, team, band, or historic event more than ONCE in a single batch.',
+  '- If you write a question about Taylor Swift, do not mention Travis Kelce or the Eras Tour in another question.',
+  '- If you write a question about Minecraft, do not use it again for any other gaming question.',
+  '- Rotate wildly across sub-genres. For sports: don\'t give 3 basketball questions; split them across Formula 1, tennis, hockey, and soccer.',
   '',
-  'Instead ask DIRECTLY using Which/Who/What/How many/In which city/Name the:',
+  '=== THE TRIVIAL PURSUIT "VOICE" ===',
+  'Trivial Pursuit questions start with compelling, authoritative trivia hooks and finish with a crisp, direct question. They never use vague, trailing pronouns.',
   '',
-  'BAD:  "She won four Grammy Awards — who is this singer?"',
-  'GOOD: "Which singer won four Grammy Awards in a single night in 2010, breaking the record for most wins by a female artist at the time?"',
+  '=== RULE: BANNED QUESTION ENDINGS ===',
+  'NEVER end a question with: "what is it?", "who is this?", "who is he/she?", "what are they?", "name this...", "what is this called?"',
+  'Instead, ask DIRECTLY using: "Which [noun]...", "Who...", "What [noun]...", "In which city...", "Name the [noun]..."',
   '',
-  'BAD:  "This game lets players build anything from blocks — what is it called?"',
-  'GOOD: "Which sandbox building game, created by Markus Persson and released in 2011, became the best-selling video game of all time?"',
+  'BAD: "She won four Grammy Awards recently — who is this singer?"',
+  'GOOD: "Which pop star made history at the Grammys by becoming the first performer to win Album of the Year four times?"',
   '',
-  'BAD:  "He surpassed Kareeems record in 2023 to become the NBAs all-time leader — who is he?"',
-  'GOOD: "Which player surpassed Kareem Abdul-Jabbars long-standing record in February 2023 to become the NBAs all-time leading scorer?"',
+  '=== CORE WRITING RULES ===',
+  '1. SHORT ANSWERS: Maximum 5 words, ideally 1-3. No conversational padding.',
+  '2. NO ANSWER LEAKAGE: Never use the answer word (or close variants) anywhere in the question text.',
+  '3. NO "AS OF" PHRASING: Never write "As of 2026" or "Currently". State the timeframe naturally: "In 2024, which singer..." or phrase it as a timeless milestone.',
+  '4. CANADIAN CONTENT: Maximize engagement by ensuring exactly 10% of questions subtly highlight Canadian achievement, geography, or history. Mark these "canadian": true.',
   '',
-  '=== WRITE LIKE TRIVIAL PURSUIT ===',
+  '=== CATEGORY BLUEPRINTS ===',
   '',
-  'EXAMPLE 1 (Geography):',
-  'Q: "Once known as Rhodesia, this landlocked southern African nation gained independence from Britain in 1980 — what is it called today?"',
-  'A: Zimbabwe',
+  'GEOGRAPHY:',
+  '- 50% Standard (Capitals, major rivers, borders, mountain ranges).',
+  '- 50% Quirky (Odd territorial anomalies, extreme weather capitals, places that changed names).',
   '',
-  'EXAMPLE 2 (TV, Movies & Music):',
-  'Q: "Before winning four Emmy Awards for playing a chemistry teacher turned drug kingpin, this actor spent years as the lovable bumbling dad on Malcolm in the Middle — which acclaimed AMC drama gave him that darker role?"',
-  'A: Breaking Bad',
+  'HISTORY:',
+  '- Rotate evenly: Ancient, Medieval, Age of Discovery, World Wars, Cold War, and Modern (2000s).',
+  '- Mix grand political movements with strange historical oddities (e.g., Pepsi briefly owning a Soviet military fleet).',
   '',
-  'EXAMPLE 3 (History):',
-  'Q: "After the assassination of Archduke Franz Ferdinand in Sarajevo in 1914, this global conflict dragged in most of the worlds major powers and claimed over 17 million lives — by what common name do we know it?"',
-  'A: World War I',
+  'SCIENCE & NATURE:',
+  '- Rotate heavily: Astronomy, human anatomy, AI/tech milestones, animal adaptations, chemistry, physics.',
   '',
-  'EXAMPLE 4 (Pop Culture):',
-  'Q: "With over 100 million YouTube subscribers and famous for giving away cars, houses, and cash to strangers, which creator became the most subscribed individual on YouTube?"',
-  'A: MrBeast',
+  'TV, MOVIES & MUSIC (Modern First, Retro Sprinkled):',
+  '- 50% must be 2020-2026 content targeting teen cultural awareness (The Bear, Wednesday, Olivia Rodrigo, Zendaya, Billie Eilish, Dune).',
+  '- 50% split across 80s, 90s, and 2000s classics (Star Wars, Friends, Eminem, Spielberg) so parents can shine.',
   '',
-  '=== CORE RULES ===',
+  'SPORTS & GAMES (Strict Counts per Batch of 10):',
+  '- Exactly 4 VIDEO GAME questions: Focus on massive modern titles (Fortnite, Roblox, Zelda, Elden Ring, Valorant) and retro mainstays (Mario, Pac-Man).',
+  '- Exactly 4 REAL SPORTS questions: Rotate across NFL, NBA, NHL, MLB, F1, Olympics, and Tennis. Never repeat a sport in the same batch.',
+  '- Exactly 2 TRADITIONAL GAMES questions: Board games, card games, chess, poker, Wordle, D&D.',
   '',
-  'ANSWERS MUST BE SHORT: Maximum 5 words, ideally 1-3 words. One clear unambiguous answer.',
-  'BAD answer: "The Battle of Thermopylae, 480 BC, fought by King Leonidas"',
-  'GOOD answer: "Battle of Thermopylae" or "Leonidas"',
+  'POP CULTURE (Heavy Teen Focus):',
+  '- 7-8 out of 10 questions must be massive internet-era pop culture (2015-2026) that a 15-year-old would know instantly: Viral trends (Stanley cups, Grimace shake), massive YouTubers (MrBeast), celebrity crossovers, meme history.',
+  '- 2-3 out of 10 questions can feature Retro cultural milestones (Y2K panic, Live Aid, MTV launch, Rubik\'s cube craze).',
+  '- NEVER lead a batch with a retro question.',
   '',
-  'ANSWER MUST NOT APPEAR IN THE QUESTION:',
-  '- Never include the answer word or any close variant in the question text',
-  '- BAD: "Which TikTok trend used the Roxannes Dance song?" with answer "The Roxanne Trend" (Roxanne appears in both)',
-  '- BAD: "The Mongol Empire stretched from Asia to Europe — who founded the Mongol Empire?" (Mongol repeated)',
-  '- Ask yourself: Does any word in my question appear in the answer? If yes, rewrite.',
-  '',
-  'NEVER DESCRIBE THE ANSWER THEN ASK WHAT IT IS:',
-  '- Context in the question must be a DIFFERENT fact about the subject',
-  '- BAD: "Although he played a meth-cooking chemistry teacher, Bryan Cranston is best known for which TV series?" (the description IS Breaking Bad)',
-  '- GOOD: "Bryan Cranston spent years as the bumbling dad on Malcolm in the Middle before landing which role that won him four Emmy Awards?"',
-  '',
-  'NO AS-OF-YEAR PHRASING:',
-  '- NEVER: "as of 2024", "as of this writing", "currently", "at the time"',
-  '- Write timeless facts: "Who holds the all-time record..." not "As of 2024, who holds..."',
-  '- For recent events, state the year naturally: "In 2023, which country..." not "As of 2023..."',
-  '',
-  'UNIQUENESS — every question in a batch must cover a different subject:',
-  '- Never two questions about the same person, show, team, platform, sport, or topic',
-  '',
-  '=== CATEGORY RULES ===',
-  '',
-  'GEOGRAPHY (50% fun/surprising, 50% knowledge-based):',
-  '- Fun/surprising: weird country facts, unexpected borders, bizarre place names, surprising geography records, islands nobody knows exist, countries that changed names, cities with unexpected climates',
-  '- Knowledge-based: capitals, rivers, mountain ranges, major bodies of water',
-  '- Rotate types: capitals, rivers, mountains, deserts, islands, borders, flags, natural wonders, country nicknames — never repeat a type',
-  '',
-  'HISTORY (50% fun/surprising, 50% knowledge-based):',
-  '- Fun/surprising: bizarre historical facts, unexpected causes of wars, strange laws, surprising firsts, great accidents and coincidences, famous last words',
-  '- Knowledge-based: dates, leaders, treaties, battles, movements',
-  '- Rotate eras: ancient, medieval, Age of Exploration, World Wars, Cold War, civil rights, recent — never cluster same era',
-  '',
-  'SCIENCE & NATURE (mix of fun and factual):',
-  '- Rotate: space/astronomy, human anatomy, chemistry, physics, biology, geology, weather, AI/technology, medicine, animals, plants, ocean life, environmental science, inventions, mathematics',
-  '',
-  'TV, MOVIES & MUSIC — current and teen-friendly first, older content sprinkled in:',
-  '- REQUIRED: at least 5 out of 10 questions MUST be from 2020-2025. Generate these FIRST.',
-  '- 2020-2025 (5+ questions): The Bear, Succession, Wednesday, Euphoria, House of the Dragon, The Last of Us, Severance, Stranger Things, Squid Game, Olivia Rodrigo, Sabrina Carpenter, SZA, Bad Bunny, Kendrick Lamar, The Weeknd, Taylor Swift Eras Tour, Chappell Roan, Billie Eilish, K-pop, Barbie movie, Oppenheimer, Top Gun Maverick, Abbott Elementary, White Lotus',
-  '- 80s sprinkle (2 questions): Michael Jackson, Madonna, Prince, Back to the Future, Cheers, ET, Die Hard',
-  '- 90s/2000s sprinkle (2 questions): Friends, The Sopranos, Eminem, Britney, Lord of the Rings, The Office, Breaking Bad',
-  '- 70s sprinkle (1 question only): Star Wars, Fleetwood Mac, ABBA, Jaws, Saturday Night Fever',
-  '- TV must make up at least 40% — ask about catchphrases, characters, plot twists, actors, spinoffs',
-  '',
-  'SPORTS & GAMES — exact split:',
-  '- 35% VIDEO GAMES: specific games, characters, developers, gaming records, esports, console wars (Minecraft, Fortnite, GTA, Zelda, Mario, Call of Duty, Elden Ring, Pokemon, Roblox, Among Us)',
-  '- 35% SPORTS: rotate across DIFFERENT sports — soccer, basketball, hockey, baseball, tennis, golf, boxing, Olympics, Formula 1, cricket, rugby, gymnastics, swimming, track and field. Never the same sport twice per batch.',
-  '- 30% BOARD/CARD/OTHER GAMES: Monopoly, Scrabble, chess, Risk, Poker, Magic: The Gathering, Dungeons and Dragons, game shows, Wordle, crossword puzzles',
-  '',
-  'POP CULTURE — primarily for TEENAGERS, older content is a small sprinkle:',
-  '- REQUIRED: 7-8 out of 10 questions MUST be things a 15-year-old would immediately recognize. Generate these FIRST.',
-  '- Teen content 2020-2025 (7-8 questions): celebrity drama (Taylor/Travis, Selena/Hailey, Will Smith slap, Kanye, Zendaya), viral moments (Grimace shake, Stanley cups, Wednesday dance, Barbie cultural impact), Gen Z news (climate strikes, AI going mainstream, COVID culture, Ukraine war reactions), TikTok creators (MrBeast, Charli D Amelio), gaming crossovers (Fortnite Travis Scott concert, Among Us politicians), award show moments, Caitlin Clark, Simone Biles comeback, LeBron scoring record',
-  '- Older sprinkle (2-3 questions MAX): Watergate, moon landing cultural moment, disco era, MTV launch 1981, Rubiks Cube craze, Pac-Man, VHS vs Betamax, Y2K panic',
-  '- NEVER start a Pop Culture batch with an older question — lead with what teenagers know',
-  '- MAX 2 social media platform questions per batch',
-  '- Only ask about things that were genuinely massive — mainstream news or tens of millions of views',
-  '',
-  '90% global topics, maximum 10% Canadian.',
-  'Mark canadian:true only for specifically Canadian content.',
-  '',
-  '=== OUTPUT ===',
-  'Respond ONLY with valid JSON, no markdown, no code fences, no explanation:',
-  '{ "questions": [ { "category": "...", "question": "...", "answer": "...", "is_pie": false, "canadian": false } ] }',
+  '=== OUTPUT FORMAT ===',
+  'Respond ONLY with valid JSON matching this schema, no markdown, no code blocks, no trailing explanations:',
+  '{ "questions": [ { "category": "...", "question": "...", "answer": "...", "is_pie": false, "canadian": false } ] }'
 ].join('\n');
 
 function buildPrompt(batchNum, focusCategories) {
@@ -132,29 +87,25 @@ function buildPrompt(batchNum, focusCategories) {
   if (focusCategories && focusCategories.length > 0) {
     const perCat = Math.ceil(30 / focusCategories.length);
     catInstructions = focusCategories
-      .map(cat => '- "' + cat + '": ' + perCat + ' regular questions + 1 pie question')
+      .map(cat => `- "${cat}": ${perCat} regular questions + 1 pie question`)
       .join('\n');
   } else {
     catInstructions = Object.entries(DISTRIBUTION)
-      .map(([cat, counts]) => '- "' + cat + '": ' + counts.regular + ' regular questions + ' + counts.pie + ' pie question')
+      .map(([cat, counts]) => `- "${cat}": ${counts.regular} regular questions + ${counts.pie} pie question`)
       .join('\n');
   }
 
-  return 'BATCH ' + batchNum + ' — Generate trivia questions with this exact distribution:\n\n' +
-    catInstructions + '\n\n' +
-    'CRITICAL REMINDERS:\n' +
-    '- Every question about a DIFFERENT subject — no repeats of person, show, sport, platform, or topic\n' +
-    '- ANSWERS: 1-5 words max, short and unambiguous\n' +
-    '- ANSWER MUST NOT appear in the question text — not even partially\n' +
-    '- NO "as of [year]" — write timeless facts or state year naturally in context\n' +
-    '- BANNED ENDINGS: never end with "what is it?", "who is this?", "who is he/she?" — ask DIRECTLY using Which/Who/What/How many\n' +
-    '- Context in question must be a DIFFERENT fact about the subject, never a description of the answer\n' +
-    '- Geography/History: 50% fun surprising facts, 50% knowledge-based\n' +
-    '- Pop Culture: 7-8 out of 10 questions MUST be 2020-2025 teen content — max 2-3 older questions, NEVER lead with old content\n' +
-    '- TV Movies Music: 5+ out of 10 questions MUST be 2020-2025 — generate recent questions FIRST then add older sprinkle\n' +
-    '- Sports & Games: 35% video games, 35% sports (different sport each question), 30% board/card games\n' +
-    '- Max 2 "what year" questions per category\n\n' +
-    'Respond ONLY with: { "questions": [...] }';
+  return [
+    `BATCH ${batchNum} — Generate trivia questions with this exact category distribution:`,
+    catInstructions,
+    '',
+    'CRITICAL BATCH ENFORCEMENT:',
+    '- RADICAL TOPIC DIVERSITY: Do not reuse a subject, person, franchise, or event across questions. (e.g., If one question is about Travis Kelce, no other question can be about Taylor Swift or the NFL).',
+    '- TEEN COMPREHENSION: Ensure the modern Pop Culture and TV/Movies/Music targets mainstream hits teenagers care about, but use descriptive hooks so older family members can reasonably attempt a guess.',
+    '- FORMATTING: Answers MUST be 1-5 words max. Do not leak the answer into the question text. Absolutely no banned ending phrases like "who is he?"',
+    '',
+    'Respond ONLY with the JSON object: { "questions": [...] }'
+  ].join('\n');
 }
 
 function normalizeCategory(cat) {
@@ -218,7 +169,7 @@ async function generateBatch(batchNum, focusCategories) {
     .filter(Boolean)
     .filter(q => {
       if (answerInQuestion(q.question, q.answer)) {
-        console.log('  Rejected (answer in question): "' + q.answer + '"');
+        console.log('   Rejected (answer in question): "' + q.answer + '"');
         return false;
       }
       return true;
@@ -238,12 +189,12 @@ async function refillBank(focusCategories) {
   let totalAdded = 0;
   try {
     for (let i = 1; i <= batchesNeeded; i++) {
-      console.log('  Generating batch ' + i + '/' + batchesNeeded + '...');
+      console.log('   Generating batch ' + i + '/' + batchesNeeded + '...');
       const questions = await generateBatch(i, focusCategories);
       const inserted  = await insertQuestions(questions);
       const count = parseInt(inserted) || 0;
       totalAdded += count;
-      console.log('  Batch ' + i + ': ' + count + ' inserted (' + (questions.length - count) + ' duplicates skipped)');
+      console.log('   Batch ' + i + ': ' + count + ' inserted (' + (questions.length - count) + ' duplicates skipped)');
       if (i < batchesNeeded) await new Promise(r => setTimeout(r, 1000));
     }
     await logRefill(before, totalAdded, 'success');
