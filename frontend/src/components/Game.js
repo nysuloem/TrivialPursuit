@@ -109,6 +109,29 @@ function stopSpeaking() {
   if (window.speechSynthesis) window.speechSynthesis.cancel();
 }
 
+// 🏀 Team switch swish sound
+function playSwish(ctx) {
+  if (!ctx) return;
+  const t = ctx.currentTime;
+  // White noise burst shaped like a swish
+  const buf = ctx.createBuffer(1, ctx.sampleRate * 0.3, ctx.sampleRate);
+  const data = buf.getChannelData(0);
+  for (let i = 0; i < data.length; i++) data[i] = (Math.random() * 2 - 1);
+  const src  = ctx.createBufferSource();
+  const filt = ctx.createBiquadFilter();
+  const gain = ctx.createGain();
+  src.buffer = buf;
+  filt.type  = 'bandpass';
+  filt.frequency.setValueAtTime(800, t);
+  filt.frequency.linearRampToValueAtTime(3000, t + 0.15);
+  filt.Q.value = 0.8;
+  src.connect(filt); filt.connect(gain); gain.connect(ctx.destination);
+  gain.gain.setValueAtTime(0.001, t);
+  gain.gain.linearRampToValueAtTime(0.3, t + 0.05);
+  gain.gain.exponentialRampToValueAtTime(0.001, t + 0.28);
+  src.start(t); src.stop(t + 0.3);
+}
+
 // ─── CONSTANTS ─────────────────────────────────────────────────────────────
 const STREAK_NEEDED = 2;
 const TEAMS = [
@@ -532,6 +555,7 @@ export default function Game() {
 
     const nextTeam = 1 - active;
     setActive(nextTeam);
+    playSwish(getAudio());
     await loadCategoryOptions(nextTeam, wedges);
   };
 
@@ -564,6 +588,7 @@ export default function Game() {
     setStreak(prev => { const n=[...prev]; n[active]={...n[active],[chosenCat]:0}; return n; });
     const nextTeam = 1 - active;
     setActive(nextTeam);
+    playSwish(getAudio());
     await loadCategoryOptions(nextTeam, wedges);
   };
 
