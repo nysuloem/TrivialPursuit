@@ -10,44 +10,64 @@ let isRefilling = false;
 
 // How many of each category + type to generate
 const DISTRIBUTION = {
-  // [category]: { regular, pie }
-  'Geography':              { regular: 7, pie: 1 },
-  'Entertainment & Music':  { regular: 9, pie: 1 },
-  'History':                { regular: 7, pie: 1 },
-  'Science & Nature':       { regular: 7, pie: 1 },
-  'Sports & Video Games':   { regular: 9, pie: 1 },
-  'Current Events & Trends':{ regular: 9, pie: 1 },
+  'Geography':           { regular: 7, pie: 1 },
+  'TV, Movies & Music':  { regular: 9, pie: 1 },
+  'History':             { regular: 7, pie: 1 },
+  'Science & Nature':    { regular: 7, pie: 1 },
+  'Sports & Video Games':{ regular: 9, pie: 1 },
+  'Pop Culture':         { regular: 9, pie: 1 },
 };
 // Total per batch: ~48 regular + 6 pie ≈ 54 per Claude call
 // We run ~5 calls to get to 250+
 
-const SYSTEM_PROMPT = `You are generating trivia questions for a Trivial Pursuit-style game played by Canadian teenagers (ages 13–18) and their parents (Boomers and Gen X, ages 40–60).
+const SYSTEM_PROMPT = `You are generating trivia questions for a Trivial Pursuit-style board game played by Canadian families — teenagers (13–18) and their parents (Boomers and Gen X, 40–60).
 
-RULES:
-- Questions must be written in TRUE Trivial Pursuit style — they are longer, richer, and more interesting than simple one-liners
-- A good Trivial Pursuit question gives CONTEXT before asking — it teaches you something even if you get it wrong
-- Example of BAD question: "What year did the Berlin Wall fall?" 
-- Example of GOOD question: "After nearly three decades of dividing East and West Germany and becoming the defining symbol of the Cold War, in what year did the Berlin Wall finally come down?"
-- Questions should be 2-3 sentences long — set the scene, then ask
-- 90% of questions should be about GLOBAL topics — not Canadian
-- Only 10% should be specifically Canadian
-- Pie questions are HARDER — require a very precise answer (exact year, exact number, exact name) that only someone who really knows their stuff would get
-- Answers must be concise and unambiguous — one clear correct answer
-- No duplicate questions
+═══ MOST IMPORTANT RULES ═══
 
-GENERATIONAL MIX — this is a family game, so spread questions across generations:
-- ~50% teen-friendly (2015–2025): TikTok, streaming, Gen Z pop culture, recent gaming, current music artists, social media, recent sports
-- ~30% Millennial/Gen X (1980–2010): classic video games, 90s/2000s TV and music, early internet, iconic movies, classic sports moments
-- ~20% Boomer-friendly (1960–1985): classic rock, vintage TV shows, historical pop culture, 70s/80s sports legends
+1. EVERY QUESTION MUST BE UNIQUE IN TOPIC
+   - Never ask two questions about the same person, show, movie, song, event, or subject
+   - Spread across as many different topics as possible
+   - If you already wrote about Taylor Swift, don't write another Taylor Swift question
+   - Variety is the #1 priority — 50 questions should cover 50 different subjects
 
-ENTERTAINMENT & MUSIC CATEGORY must include a good mix of:
-- Music (all eras — Taylor Swift AND The Beatles AND 90s hip hop AND classic rock)
-- TV shows (Netflix, HBO, classic sitcoms, reality TV, animated shows, streaming originals)
-- Movies (blockbusters, classics, recent releases)
-- Celebrities and pop culture moments
+2. QUESTIONS MUST BE TRIVIAL PURSUIT STYLE — longer, richer, with context
+   - BAD: "What year did Titanic come out?"
+   - GOOD: "James Cameron's epic romance about the doomed ocean liner became the highest-grossing film of all time when it was released — what year did it hit theatres?"
+   - Questions should give context, colour, or a fun fact BEFORE asking
+   - Most questions should be 2-3 sentences
 
-OUTPUT FORMAT: Respond ONLY with a valid JSON array. No markdown, no explanation, no backticks.
-Each object: { "category": "...", "question": "...", "answer": "...", "is_pie": false, "canadian": false }`;
+3. STRICT LIMIT: NO MORE THAN 10% OF QUESTIONS CAN BE "WHAT YEAR" QUESTIONS
+   - Vary question types: Who, What, Where, Which, How many, Name the, True identity of, What was the nickname, What does X stand for, etc.
+   - Ask about names, places, characters, records, firsts, nicknames, facts — not just years
+
+4. DIFFICULTY: Trivial Pursuit level — specific enough to challenge but fair
+   - Not too easy ("What colour is the sky?") 
+   - Not too obscure (things only experts would know)
+   - A smart teenager or an engaged adult should have a fighting chance
+
+═══ CONTENT RULES ═══
+
+- 90% global topics, 10% Canadian maximum
+- Pie questions: same style but require a very precise answer — a specific name, number, or record that takes real knowledge
+
+═══ TV, MOVIES & MUSIC — MUST COVER ALL ERAS ═══
+This category MUST have strong representation from ALL of these eras:
+- Boomer classics: 60s/70s rock, classic Hollywood films, vintage TV (M*A*S*H, All in the Family, Cheers, etc.)
+- Gen X/Millennial: 80s/90s music, blockbusters (Die Hard, Home Alone, Jurassic Park), 90s/2000s TV (Friends, Seinfeld, The Office, Breaking Bad)
+- Recent: 2020–2025 streaming hits, current music artists, recent blockbusters
+- Music must span rock, pop, hip hop, country, R&B across decades — NOT just recent pop stars
+
+═══ GENERATIONAL MIX (apply to ALL categories) ═══
+- 40% recent (2015–2025) — streaming, gaming, social media, current events
+- 35% Gen X/Millennial (1980–2010) — 80s/90s/2000s culture, classic games, iconic films
+- 25% Boomer (1960–1980) — classic rock, vintage TV, historical pop culture, 70s/80s sports
+
+═══ POP CULTURE CATEGORY ═══
+Include: viral moments, memes, social media, influencers, TikTok trends, celebrity drama, reality TV, internet culture, viral products, fashion trends, Gen Z slang, YouTube culture
+
+═══ OUTPUT FORMAT ═══
+Respond ONLY with a valid JSON object containing a "questions" array. No markdown, no backticks.
+Format: { "questions": [ { "category": "...", "question": "...", "answer": "...", "is_pie": false, "canadian": false } ] }`;
 
 function buildPrompt(batchNum) {
   const catInstructions = Object.entries(DISTRIBUTION)
@@ -55,21 +75,22 @@ function buildPrompt(batchNum) {
       `- "${cat}": ${counts.regular} regular questions + ${counts.pie} pie question (harder)`
     ).join('\n');
 
-  return `Generate trivia questions for batch ${batchNum}. Make sure these are DIFFERENT from previous batches.
+  return `Generate trivia questions for batch ${batchNum}. These MUST be completely different from any previous batch.
 
 Generate exactly this distribution:
 ${catInstructions}
 
-Remember:
-- Pie questions: harder but single-answer — one precise fact (exact year, record, name). NOT multi-part.
-- Regular questions: Trivial Pursuit difficulty — specific but answerable by a smart teen OR their parent
-- 90% global, 10% Canadian
-- Generational mix: ~50% recent (2015–2025), ~30% Gen X/Millennial (1980–2010), ~20% Boomer (1960–1985)
-- Entertainment & Music must cover: TV shows (classic AND streaming), movies, music across all eras, celebrities
-- Sports & Video Games must cover: classic sports legends AND recent stars AND video games (retro AND modern)
-- Mark canadian:true only if the question is specifically about Canada
+CRITICAL FOR THIS BATCH:
+- Every single question must be about a DIFFERENT topic/person/show/song/event
+- NO "what year" questions except maximum 1-2 per category
+- Each question needs context (2-3 sentences) before the actual question
+- TV, Movies & Music: MUST include Boomer classics, Gen X/Millennial hits, AND recent content — not just recent
+- Vary question types: Who, What, Where, Which, How many, Name the, What was the nickname, What does X stand for
+- Pie questions: harder, single precise answer, but still 2-3 sentences with context
+- 90% global, 10% Canadian max
+- Mark canadian:true only if specifically about Canada
 
-Respond with ONLY the JSON array.`;
+Respond with ONLY a JSON object: { "questions": [...] }`;
 }
 
 async function generateBatch(batchNum) {
