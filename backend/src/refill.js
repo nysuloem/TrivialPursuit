@@ -44,12 +44,14 @@ A: Tyler 'Ninja' Blevins
 ━━━ RULES ━━━
 
 CRITICAL — ANSWER MUST NOT APPEAR IN THE QUESTION:
-- Never include the answer word or a close variant of it in the question text
-- BAD: "The Mongol Empire was the largest contiguous land empire — who founded the Mongol Empire?" (answer: Genghis Khan — 'Mongol' appears twice)
-- GOOD: "At its peak it stretched from the Pacific Ocean to Eastern Europe, making it the largest contiguous land empire in history — who founded it?"
-- BAD: "LeBron James holds the NBA scoring record — how many points has LeBron scored?" (answer: LeBron — name appears twice)
+- Never include the answer word OR any key word from the answer in the question text
+- This includes partial matches, related words, and obvious hints
+- BAD: "Which 2021 TikTok trend used The Real Roxanne's 'Roxanne's Dance'?" → Answer: "The Roxanne Trend" (the word Roxanne appears in both)
+- BAD: "The Mongol Empire was the largest contiguous land empire — who founded the Mongol Empire?" → Answer: Genghis Khan ('Mongol' appears in question)
+- BAD: "LeBron James holds the NBA scoring record — how many points has LeBron scored?" → Answer: LeBron (name appears twice)
+- GOOD: Describe the subject using its characteristics, record, or context WITHOUT naming it or hinting at the answer
 - GOOD: "He surpassed Kareem Abdul-Jabbar's long-standing record in February 2023 to become the NBA's all-time leading scorer — who is he?"
-- Read every question before submitting: if the answer word appears in the question, rewrite it
+- Before finalising each question, ask yourself: "Does the question text contain any word from the answer?" If yes, rewrite it completely.
 
 UNIQUENESS & DIVERSITY — Critical for ALL categories:
 - Each question must be about a completely DIFFERENT subject
@@ -123,6 +125,7 @@ POP CULTURE — at least 60% of questions must be things a 15-year-old would kno
 - Gen Z slang, phrases, and internet culture
 - Viral products and food trends (Stanley cups, Grimace shake, etc.)
 - Fortnite/gaming culture crossovers and collaborations
+- IMPORTANT: Only ask about trends/moments that were genuinely massive and widely known — NOT obscure micro-trends that only hardcore TikTok users would remember. If it didn't make mainstream news or get tens of millions of views, don't ask about it.
 
 OTHER RULES:
 - 90% global, maximum 10% Canadian
