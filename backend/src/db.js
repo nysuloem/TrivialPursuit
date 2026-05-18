@@ -10,7 +10,7 @@ const CATEGORIES = [
   'TV, Movies & Music',
   'History',
   'Science & Nature',
-  'Sports & Video Games',
+  'Sports & Games',
   'Pop Culture',
 ];
 
