@@ -145,6 +145,8 @@ function normalizeCategory(cat) {
   if (lower.includes('sport') || lower.includes('game') || lower.includes('video')) return 'Sports & Video Games';
   return null;
 }
+
+async function generateBatch(batchNum, focusCategories = null) {
   const response = await client.chat.completions.create({
     model: 'gpt-4o',
     max_tokens: 8000,
