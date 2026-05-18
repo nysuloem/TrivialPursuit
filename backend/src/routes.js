@@ -18,6 +18,14 @@ router.post('/game/categories', async (req, res) => {
     if (cats.length < 1) {
       return res.status(503).json({ error: 'Not enough questions in bank', bankEmpty: true });
     }
+
+    // 20% chance one of the two options is "Roll Again"
+    // Roll Again replaces the second option
+    const includeRollAgain = Math.random() < 0.20;
+    if (includeRollAgain && cats.length >= 1) {
+      cats[1] = 'ROLL_AGAIN';
+    }
+
     res.json({ categories: cats });
   } catch (err) {
     console.error(err);
