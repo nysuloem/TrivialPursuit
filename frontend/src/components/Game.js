@@ -27,9 +27,9 @@ function playPieSting(ctx) {
   const t = ctx.currentTime;
   const notes = [330, 415, 523, 698];
   notes.forEach((f, i) => playTone(ctx, f, t + i * 0.13, 0.25, 'sawtooth', 0.18));
-  // Final big chord
+  
   [523, 659, 784].forEach(f => playTone(ctx, f, t + 0.58, 0.7, 'triangle', 0.15));
-  // Noise swell
+  
   const buf = ctx.createBuffer(1, ctx.sampleRate * 0.5, ctx.sampleRate);
   const data = buf.getChannelData(0);
   for (let i = 0; i < data.length; i++) data[i] = (Math.random() * 2 - 1) * 0.06;
@@ -50,15 +50,12 @@ function playPieSting(ctx) {
 function playWedgeWon(ctx) {
   if (!ctx) return;
   const t = ctx.currentTime;
-  // Rising scale
   [261, 329, 392, 523, 659, 784, 1047].forEach((f, i) =>
     playTone(ctx, f, t + i * 0.08, 0.18, 'triangle', 0.2)
   );
-  // Big chord sustain
   [523, 659, 784, 1047].forEach(f =>
     playTone(ctx, f, t + 0.62, 1.2, 'sine', 0.14)
   );
-  // Rhythm hits
   [0, 0.18, 0.36].forEach(offset =>
     playTone(ctx, 880, t + 0.65 + offset, 0.1, 'square', 0.08)
   );
@@ -68,11 +65,9 @@ function playWedgeWon(ctx) {
 function playStealSting(ctx) {
   if (!ctx) return;
   const t = ctx.currentTime;
-  // Low dramatic pulses
   [0, 0.22, 0.44].forEach(offset =>
     playTone(ctx, 110, t + offset, 0.18, 'sawtooth', 0.25)
   );
-  // Rising tension note
   const osc  = ctx.createOscillator();
   const gain = ctx.createGain();
   osc.connect(gain); gain.connect(ctx.destination);
@@ -100,12 +95,12 @@ const TEAMS = [
 ];
 
 const S = {
-  ROLLING:     'rolling',     // initial dice rolling state
+  ROLLING:     'rolling',
   CHOOSING:    'choosing',
   QUESTION:    'question',
-  PIE_INTRO:   'pie_intro',   // animated pie reveal screen
-  PIE:         'pie',         // pie question active
-  STEAL:       'steal',       // other team can steal
+  PIE_INTRO:   'pie_intro',
+  PIE:         'pie',
+  STEAL:       'steal',
   WINNER:      'winner',
 };
 
@@ -170,8 +165,8 @@ function DiceRollStart({ onRollComplete, getAudio }) {
       <h2 style={{ fontSize: 24, color: '#fff', fontWeight: 900, margin: '0 0 20px 0', fontFamily: 'Georgia, serif' }}>🎲 ROLL FOR HIGHEST START</h2>
       
       {tieMessage && (
-        <div style={{ color: '#fbbf24', fontSize: 12, fontFamily: 'monospace', marginBottom: 16, animation: 'fadeIn 0.3s ease' }}>
-          ⚠️ IT'S A TIE! ROLL AGAIN!
+        <div style={{ color: '#fbbf24', fontSize: 12, fontFamily: 'monospace', marginBottom: 16 }}>
+          ⚠️ IT\'S A TIE! ROLL AGAIN!
         </div>
       )}
 
@@ -235,7 +230,7 @@ function PieIntro({ category, teamIdx, onDone }) {
       setTimeout(onDone, 2600),
     ];
     return () => timers.forEach(clearTimeout);
-  }, [onDone]);
+  }, [onDone, setStep]);
 
   const color = CAT_COLORS[category];
   return (
@@ -243,7 +238,6 @@ function PieIntro({ category, teamIdx, onDone }) {
       position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.92)',
       display: 'flex', flexDirection: 'column', alignItems: 'center',
       justifyContent: 'center', gap: 20, zIndex: 100,
-      animation: 'fadeIn 0.3s ease',
     }}>
       <style>{`
         @keyframes fadeIn  { from { opacity:0 } to { opacity:1 } }
@@ -264,112 +258,3 @@ function PieIntro({ category, teamIdx, onDone }) {
           animation: 'slideUp 0.4s ease forwards',
           textAlign: 'center',
         }}>
-          <div style={{ fontSize: 13, letterSpacing: 6, color: color, fontFamily: 'monospace', marginBottom: 6 }}>
-            PIE QUESTION
-          </div>
-          <div style={{
-            fontSize: 'clamp(22px,5vw,36px)', color: '#fff', fontWeight: 900,
-            animation: 'glow 1.5s ease infinite',
-          }}>
-            {CAT_EMOJI[category]} {category}
-          </div>
-        </div>
-      )}
-
-      {step >= 2 && (
-        <div style={{
-          animation: 'slideUp 0.3s ease forwards',
-          fontSize: 13, color: TEAMS[teamIdx].color, fontFamily: 'monospace', letterSpacing: 3,
-        }}>
-          {TEAMS[teamIdx].emoji} {TEAMS[teamIdx].label.toUpperCase()} — ANSWER FOR THE WEDGE!
-        </div>
-      )}
-    </div>
-  );
-}
-
-function PieWedge({ color, emoji, size = 160 }) {
-  const cx = size / 2, cy = size / 2, r = size / 2 - 8;
-  const startAngle = -Math.PI / 2;
-  const endAngle   = startAngle + (Math.PI * 2) / 6;
-  const x1 = cx + r * Math.cos(startAngle);
-  const y1 = cy + r * Math.sin(startAngle);
-  const x2 = cx + r * Math.cos(endAngle);
-  const y2 = cy + r * Math.sin(endAngle);
-  const mid = (startAngle + endAngle) / 2;
-  return (
-    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
-      <defs>
-        <filter id="glow">
-          <feGaussianBlur stdDeviation="6" result="coloredBlur"/>
-          <feMerge><feMergeNode in="coloredBlur"/><feMergeNode in="SourceGraphic"/></feMerge>
-        </filter>
-      </defs>
-      <circle cx={cx} cy={cy} r={r + 6} fill="#111" />
-      <path
-        d={`M ${cx} ${cy} L ${x1} ${y1} A ${r} ${r} 0 0 1 ${x2} ${y2} Z`}
-        fill={color}
-        filter="url(#glow)"
-        stroke="#0a0a0a" strokeWidth="2"
-      />
-      <text x={cx + r * 0.58 * Math.cos(mid)} y={cy + r * 0.58 * Math.sin(mid)}
-        textAnchor="middle" dominantBaseline="middle" fontSize="28">{emoji}</text>
-    </svg>
-  );
-}
-
-// ─── STEAL SCREEN ──────────────────────────────────────────────────────────
-function StealScreen({ stealingTeamIdx, category, question, onCorrect, onWrong }) {
-  const [revealed, setRevealed] = useState(false);
-  const color  = CAT_COLORS[category];
-  const team   = TEAMS[stealingTeamIdx];
-
-  return (
-    <div style={{
-      position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.95)',
-      display: 'flex', flexDirection: 'column', alignItems: 'center',
-      justifyContent: 'center', padding: 20, zIndex: 100, gap: 16,
-    }}>
-      <style>{`
-        @keyframes stealPulse { 0%,100%{transform:scale(1)} 50%{transform:scale(1.04)} }
-      `}</style>
-
-      <div style={{ textAlign: 'center' }}>
-        <div style={{ fontSize: 36, marginBottom: 8 }}>🕵️</div>
-        <div style={{ fontSize: 11, letterSpacing: 6, color: '#f97316', fontFamily: 'monospace', marginBottom: 4 }}>
-          STEAL OPPORTUNITY
-        </div>
-        <div style={{
-          fontSize: 'clamp(20px,4vw,30px)', color: team.color, fontWeight: 900,
-          animation: 'stealPulse 1.2s ease infinite',
-        }}>
-          {team.emoji} {team.label.toUpperCase()}
-        </div>
-        <div style={{ fontSize: 11, color: '#555', fontFamily: 'monospace', marginTop: 4 }}>
-          Answer correctly to steal the wedge + get a bonus turn!
-        </div>
-      </div>
-
-      <div style={{
-        width: '100%', maxWidth: 520,
-        background: '#111',
-        border: `2px solid ${color}55`,
-        borderLeft: `4px solid ${color}`,
-        borderRadius: 10, padding: '18px 16px',
-      }}>
-        <div style={{ fontSize: 9, color: '#f97316', fontFamily: 'monospace', letterSpacing: 2, marginBottom: 12 }}>
-          🥧 {category.toUpperCase()} — SAME QUESTION
-        </div>
-        <div style={{ fontSize: 'clamp(13px,2.4vw,16px)', color: '#fffbeb', lineHeight: 1.7, marginBottom: 14 }}>
-          {question.question}
-        </div>
-
-        <div onClick={() => !revealed && setRevealed(true)} style={{
-          borderRadius: 7, padding: '11px 14px', marginBottom: 12, minHeight: 40,
-          background: revealed ? '#161616' : '#090909',
-          border: `1px solid ${revealed ? color + '33' : '#161616'}`,
-          cursor: revealed ? 'default' : 'pointer',
-        }}>
-          {revealed
-            ? <div style={{ color: '#fff', fontSize: 14, fontWeight: 600 }}>{question.answer}</div>
-            : <div style={{ color: '#1c1c1c', fontSize: 10, fontFamily: 'monospace', letterSpacing: 3 }}>▸ TAP
