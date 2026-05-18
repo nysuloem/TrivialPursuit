@@ -129,7 +129,22 @@ REMINDERS FOR THIS BATCH:
 Respond ONLY with: { "questions": [...] }`;
 }
 
-async function generateBatch(batchNum, focusCategories = null) {
+// Normalize category names in case GPT returns slight variations
+function normalizeCategory(cat) {
+  if (!cat) return null;
+  const c = cat.trim();
+  // Exact matches first
+  if (CATEGORIES.includes(c)) return c;
+  // Fuzzy matches
+  const lower = c.toLowerCase();
+  if (lower.includes('tv') || lower.includes('movie') || lower.includes('music') || lower.includes('entertainment')) return 'TV, Movies & Music';
+  if (lower.includes('pop culture') || lower.includes('current event') || lower.includes('trend')) return 'Pop Culture';
+  if (lower.includes('geograph')) return 'Geography';
+  if (lower.includes('histor')) return 'History';
+  if (lower.includes('science') || lower.includes('nature')) return 'Science & Nature';
+  if (lower.includes('sport') || lower.includes('game') || lower.includes('video')) return 'Sports & Video Games';
+  return null;
+}
   const response = await client.chat.completions.create({
     model: 'gpt-4o',
     max_tokens: 8000,
@@ -152,14 +167,18 @@ async function generateBatch(batchNum, focusCategories = null) {
   }
 
   return parsed
-    .filter(q => q && q.category && q.question && q.answer && CATEGORIES.includes(q.category))
-    .map(q => ({
-      category: q.category,
-      question: String(q.question).trim(),
-      answer:   String(q.answer).trim(),
-      is_pie:   q.is_pie === true,
-      canadian: q.canadian === true,
-    }));
+    .map(q => {
+      const cat = normalizeCategory(q.category);
+      if (!cat || !q.question || !q.answer) return null;
+      return {
+        category: cat,
+        question: String(q.question).trim(),
+        answer:   String(q.answer).trim(),
+        is_pie:   q.is_pie === true,
+        canadian: q.canadian === true,
+      };
+    })
+    .filter(Boolean);
 }
 
 async function refillBank(focusCategories = null) {
