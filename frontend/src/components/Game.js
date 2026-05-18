@@ -116,14 +116,19 @@ function playStealSting(ctx) {
   osc.start(t + 0.55); osc.stop(t + 1.2);
 }
 
-// 🎉 Correct answer — cheerful upbeat ding
+// 🎉 Correct answer — dramatic upbeat fanfare
 function playCorrect(ctx) {
   if (!ctx) return;
   const t = ctx.currentTime;
-  // Quick happy two-note ding
-  playTone(ctx, 523, t,        0.12, 'sine', 0.25);
-  playTone(ctx, 784, t + 0.12, 0.2,  'sine', 0.22);
-  playTone(ctx, 1047,t + 0.28, 0.25, 'sine', 0.18);
+  // Rising three-note ding with extra punch
+  playTone(ctx, 523, t,        0.15, 'triangle', 0.45);
+  playTone(ctx, 784, t + 0.13, 0.18, 'triangle', 0.42);
+  playTone(ctx, 1047,t + 0.26, 0.22, 'sine',     0.38);
+  playTone(ctx, 1318,t + 0.38, 0.35, 'sine',     0.30);
+  // Harmonic chord underneath
+  [523, 659, 784].forEach(f => playTone(ctx, f, t + 0.26, 0.4, 'sine', 0.12));
+  // Bright shimmer on top
+  playTone(ctx, 2093, t + 0.38, 0.2, 'sine', 0.10);
 }
 
 // 🔊 OpenAI TTS — plays question audio via backend
@@ -871,6 +876,7 @@ export default function Game() {
   useEffect(() => {
     if (!question?.question) return;
     let cancelled = false;
+    const teamAtLoad = active; // capture active team at question load time
 
     const playWhenReady = async () => {
       try {
@@ -890,10 +896,10 @@ export default function Game() {
           audio.onerror = () => { URL.revokeObjectURL(url); currentAudio = null; setSpeaking(false); };
           await audio.play();
         } else {
-          speak(question.question);
+          speak(question.question, teamAtLoad);
         }
       } catch (e) {
-        if (!cancelled) speak(question.question);
+        if (!cancelled) speak(question.question, teamAtLoad);
       }
     };
 
@@ -928,12 +934,20 @@ export default function Game() {
       setQuestion(data.question);
       setRevealed(false);
 
-      // Start pre-fetching audio immediately
+      // Start pre-fetching audio immediately using correct team voice
+      const ttsVoice = (selectedVoice && selectedVoice !== 'auto')
+        ? selectedVoice
+        : TEAM_VOICES[active][voiceIndexRef[active] % TEAM_VOICES[active].length];
+      // Advance the voice index now so it's consistent
+      if (!selectedVoice || selectedVoice === 'auto') {
+        voiceIndexRef[active] = (voiceIndexRef[active] + 1) % TEAM_VOICES[active].length;
+      }
+
       const BASE = process.env.REACT_APP_API_URL || '';
       pendingAudioRef.current = fetch(`${BASE}/api/tts`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: data.question.question, voice: selectedVoice }),
+        body: JSON.stringify({ text: data.question.question, voice: ttsVoice }),
       }).then(async r => {
         if (!r.ok) throw new Error('TTS failed');
         const blob = await r.blob();
@@ -1221,7 +1235,13 @@ export default function Game() {
   const currentStreak = streak[active];
 
   return (
-    <div style={css.page}>
+    <div style={{
+      ...css.page,
+      background: chosenCat && (state === S.QUESTION || state === S.PIE || state === S.FINAL || state === S.CAT_SPLASH)
+        ? `radial-gradient(ellipse at center, ${CAT_COLORS[chosenCat]}18 0%, #0a0a0a 65%)`
+        : '#0a0a0a',
+      transition: 'background 0.8s ease',
+    }}>
       {/* Pie intro overlay */}
       {state === S.PIE_INTRO && chosenCat && (
         <PieIntro category={chosenCat} teamIdx={active} onDone={handlePieIntroDone} />
@@ -1548,6 +1568,6 @@ export default function Game() {
 }
 
 const css = {
-  page: { minHeight:'100vh', background:'#0a0a0a', fontFamily:'Georgia,serif', display:'flex', flexDirection:'column', alignItems:'center', padding:'12px 10px 40px' },
+  page: { minHeight:'100vh', fontFamily:'Georgia,serif', display:'flex', flexDirection:'column', alignItems:'center', padding:'12px 10px 40px' },
   btn:  (color) => ({ padding:'11px 28px', borderRadius:8, border:`1px solid ${color}`, background:'#111', color:'#aaa', cursor:'pointer', fontFamily:'monospace', fontSize:12, letterSpacing:2 }),
 };
