@@ -103,23 +103,26 @@ HISTORY (50% fun/surprising, 50% knowledge-based):
 SCIENCE & NATURE (mix of fun and factual):
 - Rotate sub-topics: space/astronomy, human anatomy, chemistry, physics, biology, geology, weather, AI/technology, medicine, animals, plants, ocean life, environmental science, inventions, mathematics
 
-TV, MOVIES & MUSIC — exact split per batch:
-- 50% RECENT (2020-2025): streaming hits (The Bear, Succession, Stranger Things, Squid Game, Wednesday, Euphoria, White Lotus, House of the Dragon, The Last of Us, Severance), recent blockbusters, Gen Z artists (Olivia Rodrigo, Sabrina Carpenter, SZA, Bad Bunny, Kendrick Lamar, The Weeknd, Taylor Swift, Chappell Roan, Billie Eilish), K-pop, reality TV
-- 17% 1970s: classic rock (Led Zeppelin, Fleetwood Mac, ABBA, Eagles, David Bowie), 70s TV (M*A*S*H, All in the Family, Happy Days), 70s films (Star Wars, Jaws, The Godfather, Grease)
-- 17% 1980s: Michael Jackson, Madonna, Prince, 80s TV (Cheers, Miami Vice, Family Ties), 80s blockbusters (ET, Back to the Future, Die Hard, Top Gun, Ghostbusters)
-- 16% 1990s/2000s: Friends, The Sopranos, The Office, Breaking Bad, 90s music (Nirvana, Spice Girls, Eminem, Backstreet Boys, Britney), 2000s films (Lord of the Rings, Harry Potter, Spider-Man)
-- TV must make up at least 40% of questions — ask about catchphrases, character names, plot twists, spinoffs, actors, specific episodes
+TV, MOVIES & MUSIC — this category must feel CURRENT and teen-friendly first, with older content sprinkled in:
+- REQUIRED: out of every 10 questions, at least 5 MUST be from 2020-2025. Generate these FIRST.
+- 2020-2025 (5+ questions): The Bear, Succession, Wednesday, Euphoria, House of the Dragon, The Last of Us, Severance, Stranger Things, Squid Game, Olivia Rodrigo, Sabrina Carpenter, SZA, Bad Bunny, Kendrick Lamar, The Weeknd, Taylor Swift Eras Tour, Chappell Roan, Billie Eilish, K-pop, Barbie movie, Oppenheimer, Top Gun Maverick, Abbott Elementary, White Lotus, Only Murders in the Building
+- 80s sprinkle (2 questions): Michael Jackson, Madonna, Prince, Back to the Future, Cheers, ET, Die Hard
+- 90s/2000s sprinkle (2 questions): Friends, The Sopranos, Eminem, Britney, Lord of the Rings, The Office, Breaking Bad
+- 70s sprinkle (1 question only): Star Wars, Fleetwood Mac, ABBA, M*A*S*H, Jaws, Saturday Night Fever
+- TV must make up at least 40% — ask about catchphrases, characters, plot twists, actors, spinoffs
 
 SPORTS & GAMES — exact split per batch:
 - 35% VIDEO GAMES: specific games, characters, developers, gaming records, esports, console wars (Minecraft, Fortnite, GTA, Zelda, Mario, Call of Duty, Elden Ring, Pokemon, Roblox, Among Us)
 - 35% SPORTS: rotate across DIFFERENT sports — soccer, basketball, hockey, baseball, tennis, golf, boxing, Olympics, Formula 1, cricket, rugby, gymnastics, swimming, track & field. Never the same sport twice per batch. Include athletes from different countries and eras
 - 30% BOARD/CARD/OTHER GAMES: Monopoly, Scrabble, chess, Risk, Poker, Magic: The Gathering, Dungeons & Dragons, game shows, Wordle, crossword puzzles
 
-POP CULTURE — split per batch:
-- 75% RECENT teen-friendly (2020-2025): viral moments, memes, TikTok creators (MrBeast, Charli D'Amelio), YouTube milestones, celebrity drama teens follow, streaming moments that went viral, Gen Z slang, viral products (Stanley cups, Grimace shake), Fortnite collabs, news events teens care about
-- 25% BOOMER/GEN X pop culture: Watergate, moon landing as cultural moment, disco era, MTV launch, Walkman, VHS vs Betamax, iconic 80s/90s ads, Saturday Night Fever, Rubik's Cube craze, Pac-Man arcade culture, grunge era, Y2K panic
-- MAX 2 social media platform questions per batch — include at least 2 real news events from 2022-2025
-- Only ask about trends that were genuinely massive — if it didn't make mainstream news or get tens of millions of views, skip it
+POP CULTURE — primarily for TEENAGERS, older content is a small sprinkle only:
+- REQUIRED: out of every 10 questions, 7-8 MUST be things a 15-year-old would immediately recognize. Generate these FIRST.
+- Teen content 2020-2025 (7-8 questions): celebrity drama (Taylor/Travis, Selena/Hailey, Will Smith slap, Kanye, Zendaya), viral moments (Grimace shake, Stanley cups, Wednesday dance, Barbie cultural impact), Gen Z news (climate strikes, AI going mainstream, COVID culture, Ukraine war reactions), TikTok creators (MrBeast, Charli D'Amelio), gaming crossovers (Fortnite Travis Scott concert, Among Us politicians), award show moments, Caitlin Clark, Simone Biles comeback, LeBron scoring record
+- Older sprinkle (2-3 questions MAX — do not exceed this): Watergate, moon landing cultural moment, disco era, MTV launch 1981, Rubik's Cube craze, Pac-Man, VHS vs Betamax, Y2K panic
+- NEVER start a Pop Culture batch with an older question — lead with what teenagers know
+- MAX 2 social media platform questions per batch
+- Only ask about things that were genuinely massive — mainstream news or tens of millions of views
 
 90% global topics, maximum 10% Canadian
 Mark canadian:true only for specifically Canadian content
@@ -156,7 +159,8 @@ CRITICAL REMINDERS:
 - BANNED ENDINGS: never end with "— what is it?", "— who is this?", "— who is he/she?", "— name this..." — ask DIRECTLY using Which/Who/What/How many
 - Context in question must be a DIFFERENT fact about the subject, never a description of the answer
 - Geography/History: 50% fun surprising facts, 50% knowledge-based
-- Pop Culture: 75% recent teen-friendly, 25% Boomer/Gen X (Watergate, MTV, disco, Rubik's Cube era)
+- Pop Culture: 7-8 out of 10 questions MUST be 2020-2025 teen content — max 2-3 older questions, NEVER lead with old content
+- TV Movies Music: 5+ out of 10 questions MUST be 2020-2025 — generate recent questions FIRST then add older sprinkle
 - TV Movies Music: 50% recent (2020-2025), 50% spread across 70s/80s/90s — TV must be 40% of questions
 - Sports & Games: 35% video games, 35% sports (different sport each question), 30% board/card games
 - Max 2 "what year" questions per category
@@ -177,6 +181,21 @@ function normalizeCategory(cat) {
   if (lower.includes('science') || lower.includes('nature')) return 'Science & Nature';
   if (lower.includes('sport') || lower.includes('game') || lower.includes('video')) return 'Sports & Games';
   return null;
+}
+
+// Check if answer words appear in the question text
+function answerInQuestion(question, answer) {
+  if (!question || !answer) return false;
+  const q = question.toLowerCase();
+  // Split answer into significant words (ignore short words like "the", "a", "of")
+  const stopWords = new Set(['the','a','an','of','in','on','at','to','for','is','was','are','were','and','or','but','it','its','this','that','these','those','by','with','from','as','be','been','has','had','have','which','who','what','where','when','how','not','no','do','did','does']);
+  const answerWords = answer.toLowerCase()
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .split(/\s+/)
+    .filter(w => w.length > 3 && !stopWords.has(w));
+
+  // If any significant answer word appears in the question, reject it
+  return answerWords.some(word => q.includes(word));
 }
 
 async function generateBatch(batchNum, focusCategories = null) {
@@ -201,7 +220,7 @@ async function generateBatch(batchNum, focusCategories = null) {
     parsed = arrays.length > 0 ? arrays[0] : [];
   }
 
-  return parsed
+  const validated = parsed
     .map(q => {
       const cat = normalizeCategory(q.category);
       if (!cat || !q.question || !q.answer) return null;
@@ -213,8 +232,16 @@ async function generateBatch(batchNum, focusCategories = null) {
         canadian: q.canadian === true,
       };
     })
-    .filter(Boolean);
-}
+    .filter(Boolean)
+    .filter(q => {
+      if (answerInQuestion(q.question, q.answer)) {
+        console.log(`  ⚠ Rejected (answer in question): "${q.answer}" / "${q.question.slice(0,80)}..."`);
+        return false;
+      }
+      return true;
+    });
+
+  return validated;
 
 async function refillBank(focusCategories = null) {
   if (isRefilling) {
