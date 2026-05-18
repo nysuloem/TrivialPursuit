@@ -7,11 +7,11 @@ const pool = new Pool({
 
 const CATEGORIES = [
   'Geography',
-  'Entertainment & Music',
+  'TV, Movies & Music',
   'History',
   'Science & Nature',
   'Sports & Video Games',
-  'Current Events & Trends',
+  'Pop Culture',
 ];
 
 // ── Schema ────────────────────────────────────────────────────────────────────
@@ -82,17 +82,32 @@ async function getBankStats() {
 
 // ── Game queries ──────────────────────────────────────────────────────────────
 
-// Returns 2 random category names that have available questions
-async function getTwoCategoryOptions() {
+// Returns 2 random category names that have available questions, excluding owned wedge categories
+async function getTwoCategoryOptions(ownedCategories = []) {
   const r = await pool.query(`
     SELECT category
     FROM questions
     WHERE used = FALSE
+      AND ($1::text[] IS NULL OR category != ALL($1::text[]))
     GROUP BY category
     HAVING COUNT(*) > 0
     ORDER BY RANDOM()
     LIMIT 2
-  `);
+  `, [ownedCategories.length > 0 ? ownedCategories : null]);
+
+  // If not enough categories after exclusion, fall back without exclusion
+  if (r.rows.length < 2) {
+    const fallback = await pool.query(`
+      SELECT category
+      FROM questions
+      WHERE used = FALSE
+      GROUP BY category
+      HAVING COUNT(*) > 0
+      ORDER BY RANDOM()
+      LIMIT 2
+    `);
+    return fallback.rows.map(row => row.category);
+  }
   return r.rows.map(row => row.category);
 }
 
