@@ -562,26 +562,6 @@ export default function Game() {
   const [finalTeam,     setFinalTeam]     = useState(null);
   const [finalUsedCats, setFinalUsedCats] = useState([]);
 
-  // Load available voices
-  useEffect(() => {
-    const loadVoices = () => {
-      const v = window.speechSynthesis?.getVoices() || [];
-      if (v.length > 0) {
-        setVoices(v);
-        // Auto-select first English voice, prefer Microsoft or Google natural voices
-        const preferred = v.find(x =>
-          x.name.includes('Jenny') || x.name.includes('Aria') ||
-          x.name.includes('Zira') || x.name.includes('Google UK') ||
-          x.name.includes('Samantha')
-        ) || v.find(x => x.lang.startsWith('en')) || v[0];
-        setSelectedVoice(preferred?.name || '');
-      }
-    };
-    loadVoices();
-    window.speechSynthesis?.addEventListener('voiceschanged', loadVoices);
-    return () => window.speechSynthesis?.removeEventListener('voiceschanged', loadVoices);
-  }, []);
-
   useEffect(() => {
     getBankCount().then(d => setBankCount(d.count)).catch(() => {});
   }, []);
