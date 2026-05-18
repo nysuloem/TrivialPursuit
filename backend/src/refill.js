@@ -124,10 +124,16 @@ CONTENT MIX per batch:
 - 35% Gen X/Millennial (1980–2010): 80s/90s TV, classic films, grunge/hip-hop/pop, early internet
 - 30% Boomer (1960–1980): classic rock, vintage Hollywood, 70s/80s sports legends, historic TV
 
-TV, MOVIES & MUSIC must include ALL eras with these ratios:
-- 40% RECENT (2020-2025): current streaming hits, recent blockbusters, Gen Z artists (Olivia Rodrigo, Sabrina Carpenter, SZA, Bad Bunny, Kendrick, The Weeknd, Taylor Swift, Chappell Roan), K-pop, reality TV
-- 30% MILLENNIAL/GEN X (1990-2010): Friends, Seinfeld, The Office, Breaking Bad, Sopranos, 90s hip hop, Britney, NSYNC, Backstreet Boys, Eminem, 2000s blockbusters, grunge
-- 30% BOOMER (1960-1990): Beatles, Rolling Stones, Led Zeppelin, ABBA, Fleetwood Mac, classic Hollywood, M*A*S*H, Cheers, All in the Family, 80s pop
+TV, MOVIES & MUSIC — exact split per batch:
+- 50% RECENT (2015-2025): current streaming hits (Stranger Things, Squid Game, Wednesday, The Bear, Succession, Euphoria, etc.), recent blockbusters, Gen Z artists (Olivia Rodrigo, Sabrina Carpenter, SZA, Bad Bunny, Kendrick, The Weeknd, Taylor Swift, Chappell Roan, Billie Eilish), K-pop, reality TV, recent award show moments
+- 17% 1970s: classic rock (Led Zeppelin, Fleetwood Mac, ABBA, Eagles, David Bowie), 70s TV (M*A*S*H, All in the Family, Happy Days, Charlie's Angels), 70s films (Star Wars, Jaws, The Godfather, Grease)
+- 17% 1980s: 80s pop and rock (Michael Jackson, Madonna, Prince, Bon Jovi), 80s TV (Cheers, Seinfeld debut, The Cosby Show, Miami Vice, Family Ties), 80s blockbusters (ET, Back to the Future, Die Hard, Top Gun, Ghostbusters)
+- 16% 1990s/2000s: 90s/2000s TV (Friends, The Sopranos, The Wire, Lost, Grey's Anatomy, The Office, Survivor), 90s music (Nirvana, Spice Girls, Eminem, Backstreet Boys, Britney), 2000s films (Lord of the Rings, Harry Potter, Spider-Man)
+
+TV EMPHASIS — within each era, TV should make up at least 40% of questions:
+- Recent TV: The Bear, Succession, Stranger Things, Squid Game, Wednesday, Euphoria, White Lotus, Abbott Elementary, Ted Lasso, House of the Dragon, The Last of Us, Severance, Only Murders in the Building
+- Classic TV: Friends, Seinfeld, The Office, Breaking Bad, The Sopranos, M*A*S*H, Cheers, Game of Thrones, Lost, Grey's Anatomy, Survivor, American Idol
+- Ask about: specific episodes, catchphrases, character names, actors, plot twists, spinoffs, network vs streaming
 
 SPORTS & GAMES must include ALL of these types, with this rough split:
 - 35% VIDEO GAMES: specific games, characters, developers, gaming records, esports, gaming history, console wars, iconic moments (Minecraft, Fortnite, GTA, Zelda, Mario, Call of Duty, Elden Ring, etc.)
