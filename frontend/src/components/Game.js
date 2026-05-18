@@ -797,15 +797,6 @@ export default function Game() {
               )}
             </div>
           </div>
-            <div style={{ display:'flex', gap:8, alignItems:'center' }}>
-              {question.canadian && <div style={{ fontSize:8, color:'#cc000099', fontFamily:'monospace' }}>🍁</div>}
-              {!isPieState && (
-                <button onClick={handleSkip} disabled={loading} style={{ padding:'2px 8px', borderRadius:3, border:'1px solid #222', background:'transparent', color:'#333', cursor:'pointer', fontSize:9, fontFamily:'monospace' }}>
-                  SKIP
-                </button>
-              )}
-            </div>
-          </div>
 
           <div style={{ fontSize:'clamp(18px,3vw,24px)', color:isPieState?'#fffbeb':'#ddd', lineHeight:1.7, marginBottom:18, minHeight:60 }}>
             {question.question}
