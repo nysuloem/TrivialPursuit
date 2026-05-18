@@ -256,4 +256,120 @@ function PieIntro({ category, teamIdx, onDone }) {
         animation: step >= 0 ? 'popIn 0.5s cubic-bezier(0.34,1.56,0.64,1) forwards' : 'none',
         opacity: 0,
       }}>
-        <Pie
+        <PieWedge color={color} emoji={CAT_EMOJI[category]} />
+      </div>
+
+      {step >= 1 && (
+        <div style={{
+          animation: 'slideUp 0.4s ease forwards',
+          textAlign: 'center',
+        }}>
+          <div style={{ fontSize: 13, letterSpacing: 6, color: color, fontFamily: 'monospace', marginBottom: 6 }}>
+            PIE QUESTION
+          </div>
+          <div style={{
+            fontSize: 'clamp(22px,5vw,36px)', color: '#fff', fontWeight: 900,
+            animation: 'glow 1.5s ease infinite',
+          }}>
+            {CAT_EMOJI[category]} {category}
+          </div>
+        </div>
+      )}
+
+      {step >= 2 && (
+        <div style={{
+          animation: 'slideUp 0.3s ease forwards',
+          fontSize: 13, color: TEAMS[teamIdx].color, fontFamily: 'monospace', letterSpacing: 3,
+        }}>
+          {TEAMS[teamIdx].emoji} {TEAMS[teamIdx].label.toUpperCase()} — ANSWER FOR THE WEDGE!
+        </div>
+      )}
+    </div>
+  );
+}
+
+function PieWedge({ color, emoji, size = 160 }) {
+  const cx = size / 2, cy = size / 2, r = size / 2 - 8;
+  const startAngle = -Math.PI / 2;
+  const endAngle   = startAngle + (Math.PI * 2) / 6;
+  const x1 = cx + r * Math.cos(startAngle);
+  const y1 = cy + r * Math.sin(startAngle);
+  const x2 = cx + r * Math.cos(endAngle);
+  const y2 = cy + r * Math.sin(endAngle);
+  const mid = (startAngle + endAngle) / 2;
+  return (
+    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+      <defs>
+        <filter id="glow">
+          <feGaussianBlur stdDeviation="6" result="coloredBlur"/>
+          <feMerge><feMergeNode in="coloredBlur"/><feMergeNode in="SourceGraphic"/></feMerge>
+        </filter>
+      </defs>
+      <circle cx={cx} cy={cy} r={r + 6} fill="#111" />
+      <path
+        d={`M ${cx} ${cy} L ${x1} ${y1} A ${r} ${r} 0 0 1 ${x2} ${y2} Z`}
+        fill={color}
+        filter="url(#glow)"
+        stroke="#0a0a0a" strokeWidth="2"
+      />
+      <text x={cx + r * 0.58 * Math.cos(mid)} y={cy + r * 0.58 * Math.sin(mid)}
+        textAnchor="middle" dominantBaseline="middle" fontSize="28">{emoji}</text>
+    </svg>
+  );
+}
+
+// ─── STEAL SCREEN ──────────────────────────────────────────────────────────
+function StealScreen({ stealingTeamIdx, category, question, onCorrect, onWrong }) {
+  const [revealed, setRevealed] = useState(false);
+  const color  = CAT_COLORS[category];
+  const team   = TEAMS[stealingTeamIdx];
+
+  return (
+    <div style={{
+      position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.95)',
+      display: 'flex', flexDirection: 'column', alignItems: 'center',
+      justifyContent: 'center', padding: 20, zIndex: 100, gap: 16,
+    }}>
+      <style>{`
+        @keyframes stealPulse { 0%,100%{transform:scale(1)} 50%{transform:scale(1.04)} }
+      `}</style>
+
+      <div style={{ textAlign: 'center' }}>
+        <div style={{ fontSize: 36, marginBottom: 8 }}>🕵️</div>
+        <div style={{ fontSize: 11, letterSpacing: 6, color: '#f97316', fontFamily: 'monospace', marginBottom: 4 }}>
+          STEAL OPPORTUNITY
+        </div>
+        <div style={{
+          fontSize: 'clamp(20px,4vw,30px)', color: team.color, fontWeight: 900,
+          animation: 'stealPulse 1.2s ease infinite',
+        }}>
+          {team.emoji} {team.label.toUpperCase()}
+        </div>
+        <div style={{ fontSize: 11, color: '#555', fontFamily: 'monospace', marginTop: 4 }}>
+          Answer correctly to steal the wedge + get a bonus turn!
+        </div>
+      </div>
+
+      <div style={{
+        width: '100%', maxWidth: 520,
+        background: '#111',
+        border: `2px solid ${color}55`,
+        borderLeft: `4px solid ${color}`,
+        borderRadius: 10, padding: '18px 16px',
+      }}>
+        <div style={{ fontSize: 9, color: '#f97316', fontFamily: 'monospace', letterSpacing: 2, marginBottom: 12 }}>
+          🥧 {category.toUpperCase()} — SAME QUESTION
+        </div>
+        <div style={{ fontSize: 'clamp(13px,2.4vw,16px)', color: '#fffbeb', lineHeight: 1.7, marginBottom: 14 }}>
+          {question.question}
+        </div>
+
+        <div onClick={() => !revealed && setRevealed(true)} style={{
+          borderRadius: 7, padding: '11px 14px', marginBottom: 12, minHeight: 40,
+          background: revealed ? '#161616' : '#090909',
+          border: `1px solid ${revealed ? color + '33' : '#161616'}`,
+          cursor: revealed ? 'default' : 'pointer',
+        }}>
+          {revealed
+            ? <div style={{ color: '#fff', fontSize: 14, fontWeight: 600 }}>{question.answer}</div>
+            : <div style={{ color: '#1c1c1c', fontSize: 10, fontFamily: 'monospace', letterSpacing: 3 }}>▸ TAP
