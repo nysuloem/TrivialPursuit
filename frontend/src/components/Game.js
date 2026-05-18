@@ -94,4 +94,78 @@ function playDiceSound(ctx) {
 
 // ─── CONSTANTS ─────────────────────────────────────────────────────────────
 const STREAK_NEEDED = 2;
-const TEAMS =
+const TEAMS = [
+  { label: 'Boys',  emoji: '👦', color: '#3b82f6' },
+  { label: 'Girls', emoji: '👧', color: '#ec4899' },
+];
+
+const S = {
+  ROLLING:     'rolling',     // initial dice rolling state
+  CHOOSING:    'choosing',
+  QUESTION:    'question',
+  PIE_INTRO:   'pie_intro',   // animated pie reveal screen
+  PIE:         'pie',         // pie question active
+  STEAL:       'steal',       // other team can steal
+  WINNER:      'winner',
+};
+
+// ─── DICE ROLLING COMPONENT ───────────────────────────────────────────────
+function DiceRollStart({ onRollComplete, getAudio }) {
+  const [rolls, setRolls] = useState([null, null]);
+  const [rolling, setRolling] = useState([false, false]);
+  const [tieMessage, setTieMessage] = useState(false);
+
+  const rollDie = (teamIdx) => {
+    const ctx = getAudio(); // Unlock and get audio context
+    if (rolling[teamIdx] || (rolls[0] !== null && rolls[1] !== null && !tieMessage)) return;
+
+    setTieMessage(false);
+    const newRolling = [...rolling];
+    newRolling[teamIdx] = true;
+    setRolling(newRolling);
+
+    let counter = 0;
+    const interval = setInterval(() => {
+      setRolls(prev => {
+        const next = [...prev];
+        next[teamIdx] = Math.floor(Math.random() * 6) + 1;
+        return next;
+      });
+      playDiceSound(ctx);
+      counter++;
+      
+      if (counter > 10) {
+        clearInterval(interval);
+        setRolling(prev => {
+          const next = [...prev];
+          next[teamIdx] = false;
+          return next;
+        });
+      }
+    }, 80);
+  };
+
+  // Listen for when both teams finish rolling
+  useEffect(() => {
+    if (rolling[0] || rolling[1]) return;
+    if (rolls[0] !== null && rolls[1] !== null) {
+      if (rolls[0] === rolls[1]) {
+        const tieTimer = setTimeout(() => {
+          setTieMessage(true);
+          setRolls([null, null]);
+        }, 1000);
+        return () => clearTimeout(tieTimer);
+      } else {
+        const winnerIdx = rolls[0] > rolls[1] ? 0 : 1;
+        const proceedTimer = setTimeout(() => {
+          onRollComplete(winnerIdx);
+        }, 1800);
+        return () => clearTimeout(proceedTimer);
+      }
+    }
+  }, [rolls, rolling, onRollComplete]);
+
+  return (
+    <div style={{ width: '100%', maxWidth: 480, textAlign: 'center', padding: 20, background: '#0d0d0d', borderRadius: 12, border: '1px solid #1c1c1c' }}>
+      <div style={{ fontSize: 11, letterSpacing: 5, color: '#666', fontFamily: 'monospace', marginBottom: 6 }}>DETERMINE FIRST TURN</div>
+      <h2 style={{ fontSize:
