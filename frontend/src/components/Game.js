@@ -532,7 +532,8 @@ function StealScreen({ stealingTeamIdx, category, question, onCorrect, onWrong }
 
 // ─── MAIN GAME ─────────────────────────────────────────────────────────────
 export default function Game() {
-  const audioCtxRef = useRef(null);
+  const audioCtxRef    = useRef(null);
+  const pendingAudioRef = useRef(null);
 
   // Lazily init audio context on first user interaction
   const getAudio = () => {
@@ -566,16 +567,23 @@ export default function Game() {
     getBankCount().then(d => setBankCount(d.count)).catch(() => {});
   }, []);
 
-  const loadCategoryOptions = useCallback(async (activeTeam, currentWedges) => {
+  const loadCategoryOptions = useCallback(async (activeTeam, currentWedges, checkFinal = true) => {
     setLoading(true); setError(null);
     try {
+      // If the OTHER team has all wedges (is in final mode), go back to final pick after this turn
+      if (checkFinal && finalTeam !== null && finalTeam !== activeTeam) {
+        setActive(finalTeam);
+        setState(S.FINAL_PICK);
+        setLoading(false);
+        return;
+      }
       const owned = currentWedges ? currentWedges[activeTeam ?? 0] : [];
       const data = await getCategories(owned);
       setCatOptions(data.categories);
       setState(S.CHOOSING);
     } catch (e) { setError(e.message); }
     finally { setLoading(false); }
-  }, []);
+  }, [finalTeam]);
 
   useEffect(() => { loadCategoryOptions(0, [[], []]); }, [loadCategoryOptions]);
 
@@ -592,11 +600,38 @@ export default function Game() {
     );
   }, [selectedVoice]);
 
-  // Auto-read question aloud whenever a new question loads
+  // Auto-read question aloud when new question loads — uses pre-fetched audio
   useEffect(() => {
     if (!question?.question) return;
-    const timer = setTimeout(() => speak(question.question), 300);
-    return () => { clearTimeout(timer); stopTTS(); };
+    let cancelled = false;
+
+    const playWhenReady = async () => {
+      try {
+        let url = null;
+        if (pendingAudioRef.current) {
+          url = await pendingAudioRef.current;
+          pendingAudioRef.current = null;
+        }
+        if (cancelled) return;
+
+        if (url) {
+          if (currentAudio) { currentAudio.pause(); currentAudio = null; }
+          const audio = new Audio(url);
+          currentAudio = audio;
+          audio.onplay  = () => setSpeaking(true);
+          audio.onended = () => { URL.revokeObjectURL(url); currentAudio = null; setSpeaking(false); };
+          audio.onerror = () => { URL.revokeObjectURL(url); currentAudio = null; setSpeaking(false); };
+          await audio.play();
+        } else {
+          speak(question.question);
+        }
+      } catch (e) {
+        if (!cancelled) speak(question.question);
+      }
+    };
+
+    const timer = setTimeout(playWhenReady, 100);
+    return () => { cancelled = true; clearTimeout(timer); stopTTS(); };
   }, [question]); // eslint-disable-line
 
   const triggerFlash = (type) => {
@@ -612,18 +647,35 @@ export default function Game() {
     } catch (e) { console.error(e); }
   }, [question]);
 
+  // Pre-fetched audio URL — ready to play as soon as question appears
+  const pendingAudioRef = useRef(null);
+
   // Team picks a category from the choosing screen
   const handlePickCategory = async (cat) => {
     getAudio(); // unlock audio context on user tap
     setLoading(true); setError(null); setChosenCat(cat);
-    setRevealed(false); setSpeaking(false); stopSpeaking();
+    setRevealed(false); setSpeaking(false); stopTTS();
     try {
       const catStreak = streak[active][cat] || 0;
       const isPieTurn = catStreak >= STREAK_NEEDED && !wedges[active].includes(cat);
 
+      // Fetch question first so we have the text
       const data = await getQuestion(cat, isPieTurn);
       setQuestion(data.question);
-      setRevealed(false); // double-reset to be safe
+      setRevealed(false);
+
+      // Immediately start pre-fetching TTS audio in background
+      // Store the promise so the auto-speak useEffect can await it
+      const BASE = process.env.REACT_APP_API_URL || '';
+      pendingAudioRef.current = fetch(`${BASE}/api/tts`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: data.question.question, voice: selectedVoice }),
+      }).then(async r => {
+        if (!r.ok) throw new Error('TTS failed');
+        const blob = await r.blob();
+        return URL.createObjectURL(blob);
+      }).catch(() => null);
 
       if (isPieTurn) {
         playPieSting(getAudio());
@@ -720,8 +772,11 @@ export default function Game() {
     setStreak(prev => { const n=[...prev]; n[active]={...n[active],[chosenCat]:0}; return n; });
 
     if (state === S.FINAL) {
-      // Wrong on final — go back to opponent picking again (different category)
-      setState(S.FINAL_PICK);
+      // Wrong on final — other team gets their normal turn first, then come back to final
+      const nextTeam = 1 - active;
+      setActive(nextTeam);
+      playSwish(getAudio());
+      await loadCategoryOptions(nextTeam, wedges);
       return;
     }
 
@@ -973,25 +1028,23 @@ export default function Game() {
               </div>
             )}
           </div>
-          <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:10 }}>
             {CATEGORIES.map(cat => {
               const alreadyUsed = finalUsedCats.includes(cat);
               return (
                 <button key={cat} onClick={() => !alreadyUsed && handleFinalCategoryPick(cat)}
                   disabled={loading || alreadyUsed} style={{
-                  padding:'20px 24px', borderRadius:12,
+                  padding:'16px 10px', borderRadius:12,
                   border:`2px solid ${alreadyUsed ? '#222' : CAT_COLORS[cat]+'55'}`,
                   background: alreadyUsed ? '#0d0d0d' : `${CAT_COLORS[cat]}10`,
                   color: alreadyUsed ? '#333' : '#fff',
                   cursor: alreadyUsed ? 'not-allowed' : 'pointer',
-                  textAlign:'left', display:'flex', alignItems:'center', gap:16,
-                  opacity: alreadyUsed ? 0.4 : 1,
+                  textAlign:'center', display:'flex', flexDirection:'column',
+                  alignItems:'center', gap:8, opacity: alreadyUsed ? 0.4 : 1,
                 }}>
-                  <span style={{ fontSize:36 }}>{CAT_EMOJI[cat]}</span>
-                  <div>
-                    <div style={{ fontSize:20, fontWeight:700, color: alreadyUsed ? '#333' : CAT_COLORS[cat] }}>{cat}</div>
-                    {alreadyUsed && <div style={{ fontSize:11, color:'#444', fontFamily:'monospace', marginTop:2 }}>already used</div>}
-                  </div>
+                  <span style={{ fontSize:32 }}>{CAT_EMOJI[cat]}</span>
+                  <div style={{ fontSize:12, fontWeight:700, color: alreadyUsed ? '#333' : CAT_COLORS[cat], lineHeight:1.3 }}>{cat}</div>
+                  {alreadyUsed && <div style={{ fontSize:9, color:'#444', fontFamily:'monospace' }}>used</div>}
                 </button>
               );
             })}
