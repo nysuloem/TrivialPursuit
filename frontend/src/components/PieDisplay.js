@@ -2,29 +2,29 @@ import React from 'react';
 
 const CATEGORIES = [
   'Geography',
-  'Entertainment & Music',
+  'TV, Movies & Music',
   'History',
   'Science & Nature',
   'Sports & Video Games',
-  'Current Events & Trends',
+  'Pop Culture',
 ];
 
 const CAT_COLORS = {
-  'Geography':              '#3b82f6',
-  'Entertainment & Music':  '#ef4444',
-  'History':                '#b45309',
-  'Science & Nature':       '#d97706',
-  'Sports & Video Games':   '#7c3aed',
-  'Current Events & Trends':'#0891b2',
+  'Geography':           '#3b82f6',
+  'TV, Movies & Music':  '#ef4444',
+  'History':             '#b45309',
+  'Science & Nature':    '#d97706',
+  'Sports & Video Games':'#7c3aed',
+  'Pop Culture':         '#0891b2',
 };
 
 const CAT_EMOJI = {
-  'Geography':              '🌍',
-  'Entertainment & Music':  '🎬',
-  'History':                '📜',
-  'Science & Nature':       '🔬',
-  'Sports & Video Games':   '🎮',
-  'Current Events & Trends':'📰',
+  'Geography':           '🌍',
+  'TV, Movies & Music':  '🎬',
+  'History':             '📜',
+  'Science & Nature':    '🔬',
+  'Sports & Video Games':'🎮',
+  'Pop Culture':         '🌟',
 };
 
 export { CATEGORIES, CAT_COLORS, CAT_EMOJI };
