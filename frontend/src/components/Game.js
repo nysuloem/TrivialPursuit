@@ -137,6 +137,13 @@ const VOICE_LABELS  = {
   shimmer: 'Shimmer (soft female)',
 };
 
+// Voices for each team — opposite gender reads to you
+const TEAM_VOICES = [
+  ['nova', 'shimmer', 'fable'],   // Boys' turn → female voices read
+  ['onyx', 'echo', 'alloy'],      // Girls' turn → male voices read
+];
+const voiceIndexRef = [0, 0]; // tracks rotation within each team's voice list
+
 let currentAudio = null;
 
 async function playTTS(text, voice = 'nova', onStart, onEnd, onError) {
@@ -799,7 +806,7 @@ export default function Game() {
   const [winner,     setWinner]     = useState(null);
   const [pieWinCat,     setPieWinCat]     = useState(null);
   const [speaking,      setSpeaking]      = useState(false);
-  const [selectedVoice, setSelectedVoice] = useState('nova');
+  const [selectedVoice, setSelectedVoice] = useState('auto'); // auto = rotate by team
   const [finalTeam,     setFinalTeam]     = useState(null);
   const [finalUsedCats, setFinalUsedCats] = useState([]);
 
@@ -837,18 +844,28 @@ export default function Game() {
     loadCategoryOptions(winnerIdx, [[], []]);
   }, [loadCategoryOptions]);
 
-  // Speak helper — uses OpenAI TTS via backend
-  const speak = useCallback((text) => {
+  // Speak helper — auto-selects voice based on active team, rotates through voices
+  const speak = useCallback((text, teamIdx) => {
     if (!text) return;
     setSpeaking(true);
+
+    // If manual voice override is set, use it; otherwise auto-pick by team
+    let voice = selectedVoice;
+    if (!selectedVoice || selectedVoice === 'auto') {
+      const team = teamIdx !== undefined ? teamIdx : active;
+      const voices = TEAM_VOICES[team];
+      voice = voices[voiceIndexRef[team] % voices.length];
+      voiceIndexRef[team] = (voiceIndexRef[team] + 1) % voices.length;
+    }
+
     playTTS(
       text,
-      selectedVoice,
+      voice,
       () => setSpeaking(true),
       () => setSpeaking(false),
       () => setSpeaking(false),
     );
-  }, [selectedVoice]);
+  }, [selectedVoice, active]);
 
   // Auto-read question aloud when new question loads — uses pre-fetched audio
   useEffect(() => {
@@ -1081,11 +1098,19 @@ export default function Game() {
     const newWedges = awardWedge(stealingTeam, chosenCat, wedges);
     setWedges(newWedges);
     playWedgeWon(getAudio());
-    setStreak(prev => { const n=[...prev]; n[stealingTeam]={...n[stealingTeam],[chosenCat]:0}; return n; });
+
+    // Reset BOTH teams' streaks for this category
+    // — stealing team gets the wedge (streak irrelevant)
+    // — original team must earn pie chance again from scratch
+    setStreak(prev => {
+      const n = [...prev];
+      n[stealingTeam] = { ...n[stealingTeam], [chosenCat]: 0 };
+      n[active]       = { ...n[active],       [chosenCat]: 0 };
+      return n;
+    });
 
     if (checkForFinal(stealingTeam, newWedges, stealingTeam)) return;
 
-    // Show pie win celebration for stealing team
     setPieWinCat(chosenCat);
     setActive(stealingTeam);
     setState(S.PIE_WIN);
@@ -1226,7 +1251,7 @@ export default function Game() {
             {bankCount} questions in bank{bankCount < 250 ? ' · refilling...' : ''}
           </div>
         )}
-        {/* OpenAI Voice selector */}
+        {/* Voice selector */}
         <div style={{ marginTop:8, display:'flex', alignItems:'center', justifyContent:'center', gap:8 }}>
           <span style={{ fontSize:10, color:'#444', fontFamily:'monospace' }}>🔊 VOICE:</span>
           <select
@@ -1235,9 +1260,10 @@ export default function Game() {
             style={{
               background:'#111', border:'1px solid #222', borderRadius:4,
               color:'#888', fontSize:10, fontFamily:'monospace', padding:'3px 8px',
-              cursor:'pointer', maxWidth:220,
+              cursor:'pointer', maxWidth:240,
             }}
           >
+            <option value="auto">Auto — rotates by team 🎲</option>
             {OPENAI_VOICES.map(v => (
               <option key={v} value={v}>{VOICE_LABELS[v]}</option>
             ))}
