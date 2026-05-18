@@ -166,7 +166,7 @@ function DiceRollStart({ onRollComplete, getAudio }) {
       
       {tieMessage && (
         <div style={{ color: '#fbbf24', fontSize: 12, fontFamily: 'monospace', marginBottom: 16 }}>
-          ⚠️ IT\'S A TIE! ROLL AGAIN!
+          ⚠️ IT'S A TIE! ROLL AGAIN!
         </div>
       )}
 
@@ -258,3 +258,7 @@ function PieIntro({ category, teamIdx, onDone }) {
           animation: 'slideUp 0.4s ease forwards',
           textAlign: 'center',
         }}>
+          <div style={{ fontSize: 13, letterSpacing: 6, color: color, fontFamily: 'monospace', marginBottom: 6 }}>
+            PIE QUESTION
+          </div>
+          <div
