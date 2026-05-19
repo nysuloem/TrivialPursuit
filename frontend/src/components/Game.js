@@ -924,6 +924,16 @@ export default function Game() {
     } catch (e) { console.error(e); }
   }, [question]);
 
+  // Calculate random pie chance based on score
+  // 0-5 pts: 0%, 6-10: 20%, 11-15: 35%, 16-20: 50%, 21+: 65%
+  const getRandomPieChance = (score) => {
+    if (score <= 5)  return 0;
+    if (score <= 10) return 0.20;
+    if (score <= 15) return 0.35;
+    if (score <= 20) return 0.50;
+    return 0.65;
+  };
+
   // Team picks a category from the choosing screen
   const handlePickCategory = async (cat) => {
     getAudio();
@@ -931,7 +941,19 @@ export default function Game() {
     setRevealed(false); setSpeaking(false); stopTTS();
     try {
       const catStreak = streak[active][cat] || 0;
-      const isPieTurn = catStreak >= STREAK_NEEDED && !wedges[active].includes(cat);
+      const alreadyOwned = wedges[active].includes(cat);
+
+      // Determine if this is a pie turn:
+      // 1. Earned via 2-in-a-row streak (as before)
+      // 2. OR random lucky pie based on score (only if don't already own wedge)
+      const earnedPie = catStreak >= STREAK_NEEDED && !alreadyOwned;
+      const randomPieChance = getRandomPieChance(scores[active]);
+      const luckyPie = !alreadyOwned && !earnedPie && Math.random() < randomPieChance;
+      const isPieTurn = earnedPie || luckyPie;
+
+      if (luckyPie) {
+        console.log('🎲 Lucky pie triggered! Score:', scores[active], 'Chance was:', Math.round(randomPieChance * 100) + '%');
+      }
 
       // Fetch question and start pre-fetching TTS audio simultaneously
       const data = await getQuestion(cat, isPieTurn);
@@ -962,7 +984,6 @@ export default function Game() {
         playPieSting(getAudio());
         setState(S.PIE_INTRO);
       } else {
-        // Show category splash while audio pre-fetches
         setState(S.CAT_SPLASH);
       }
     } catch (e) { setError(e.message); }
@@ -1416,6 +1437,8 @@ export default function Game() {
               const alreadyOwned = wedges[active].includes(cat);
               const streakInCat  = streak[active][cat] || 0;
               const pieReady     = streakInCat >= STREAK_NEEDED && !alreadyOwned;
+              const randomChance = getRandomPieChance(scores[active]);
+              const showLuckyChance = !alreadyOwned && !pieReady && randomChance > 0;
               return (
                 <button key={cat} onClick={() => handlePickCategory(cat)} disabled={loading} style={{
                   padding:'22px 24px', borderRadius:12,
@@ -1425,12 +1448,20 @@ export default function Game() {
                   display:'flex', alignItems:'center', gap:16,
                 }}>
                   <span style={{ fontSize:36 }}>{CAT_EMOJI[cat]}</span>
-                  <div>
+                  <div style={{ flex:1 }}>
                     <div style={{ fontSize:20, fontWeight:700, color: pieReady ? '#fbbf24' : CAT_COLORS[cat] }}>{cat}</div>
                     <div style={{ fontSize:13, color:'#555', fontFamily:'monospace', marginTop:4 }}>
-                      {alreadyOwned ? '✓ wedge owned' : pieReady ? '🥧 PIE QUESTION READY!' : streakInCat > 0 ? `🔥 ${streakInCat}/${STREAK_NEEDED} — one more for pie!` : 'tap to play'}
+                      {alreadyOwned ? '✓ wedge owned'
+                        : pieReady ? '🥧 PIE QUESTION READY!'
+                        : streakInCat > 0 ? `🔥 ${streakInCat}/${STREAK_NEEDED} — one more for pie!`
+                        : 'tap to play'}
                     </div>
                   </div>
+                  {showLuckyChance && (
+                    <div style={{ textAlign:'center', fontSize:10, color:'#fbbf2488', fontFamily:'monospace' }}>
+                      🎲 {Math.round(randomChance * 100)}%<br/>lucky pie
+                    </div>
+                  )}
                 </button>
               );
             })}
