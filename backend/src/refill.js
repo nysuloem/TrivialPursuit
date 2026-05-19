@@ -18,6 +18,17 @@ const DISTRIBUTION = {
   'Pop Culture':        { regular: 10, pie: 1 },
 };
 
+// Per-category counts for small batches of 10
+const SMALL_BATCH = {
+  'Geography':          { regular: 1, pie: 0 },
+  'TV, Movies & Music': { regular: 2, pie: 0 },
+  'History':            { regular: 1, pie: 0 },
+  'Science & Nature':   { regular: 1, pie: 0 },
+  'Sports & Games':     { regular: 2, pie: 0 },
+  'Pop Culture':        { regular: 2, pie: 0 },
+  // One random category gets the pie question per batch
+};
+
 const SYSTEM_PROMPT = [
   'You are an expert trivia writer crafting questions for a Canadian family Trivial Pursuit-style board game.',
   'Players span three generations: Teenagers (13-18), Gen X Parents (40-55), and Boomers (60+).',
@@ -134,35 +145,44 @@ const SYSTEM_PROMPT = [
   '{ "questions": [ { "category": "...", "question": "...", "answer": "...", "is_pie": false, "canadian": false } ] }',
 ].join('\n');
 
-function buildPrompt(batchNum, focusCategories) {
+function buildPrompt(batchNum, focusCategories, usedTopics) {
   let catInstructions;
   if (focusCategories && focusCategories.length > 0) {
-    const perCat = Math.ceil(30 / focusCategories.length);
     catInstructions = focusCategories
-      .map(cat => '- "' + cat + '": ' + perCat + ' regular questions + 1 pie question')
+      .map(cat => '- "' + cat + '": 2 regular questions + 1 pie question')
       .join('\n');
   } else {
-    catInstructions = Object.entries(DISTRIBUTION)
-      .map(([cat, counts]) => '- "' + cat + '": ' + counts.regular + ' regular questions + ' + counts.pie + ' pie question')
+    // Small batch of ~10 questions, one pie question in a random category
+    const pieCategory = CATEGORIES[batchNum % CATEGORIES.length];
+    catInstructions = Object.entries(SMALL_BATCH)
+      .map(([cat, counts]) => {
+        const pie = cat === pieCategory ? 1 : 0;
+        return '- "' + cat + '": ' + counts.regular + ' regular question' + (counts.regular > 1 ? 's' : '') + (pie ? ' + 1 pie question' : '');
+      })
       .join('\n');
   }
+
+  const topicMemory = usedTopics && usedTopics.length > 0
+    ? '\nTOPICS ALREADY USED THIS SESSION — do NOT repeat any of these subjects, people, shows, or events:\n' +
+      usedTopics.slice(-80).map(t => '- ' + t).join('\n') + '\n'
+    : '';
 
   return [
     'BATCH ' + batchNum + ' — Generate trivia questions with this exact distribution:',
     catInstructions,
-    '',
+    topicMemory,
     'CRITICAL BATCH REMINDERS:',
-    '- RADICAL DIVERSITY: Every question must cover a completely different subject — no repeat of person, show, sport, platform, or topic',
+    '- RADICAL DIVERSITY: Every question must be about something completely different from all other questions in this batch AND from the topics listed above',
+    '- Dig DEEP into your knowledge — avoid obvious well-known examples. If Science gives you gravity or photosynthesis, reject that instinct and find something more interesting.',
     '- SHORT ANSWERS: 1-5 words max, ideally 1-3 words, one clear answer',
     '- NO ANSWER LEAKAGE: The answer word must not appear anywhere in the question text',
-    '- NO BANNED ENDINGS: Never end with "who is this?", "what is it?", "who is he/she?" — ask DIRECTLY using Which/Who/What/How many',
-    '- NO AS-OF PHRASING: Write timeless facts or state the year naturally in context',
+    '- NO BANNED ENDINGS: Never end with "who is this?", "what is it?", "who is he/she?" — ask DIRECTLY',
+    '- NO AS-OF PHRASING: Write timeless facts or state the year naturally',
     '- BRIDGE PRINCIPLE: Frame modern questions so older players can attempt them; frame retro questions so teens find them interesting',
-    '- Geography/History: 50% fun surprising facts, 50% knowledge-based; rotate eras and sub-types every question',
-    '- Pop Culture: Generate teen 2020-2025 content FIRST — 7-8 out of 10 questions; max 2-3 retro; never lead with retro',
-    '- TV Movies Music: Generate 2020-2025 content FIRST — 5+ out of 10; TV must be 40% of questions',
-    '- Sports & Games: Exactly 4 video games, 4 sports (different sport each), 2 traditional games',
-    '- Max 2 "what year" questions per category',
+    '- Geography/History: 50% fun surprising facts, 50% knowledge-based',
+    '- Pop Culture: lead with teen 2020-2025 content; max 2-3 retro per full batch',
+    '- TV Movies Music: lead with 2020-2025 content; TV must be 40% of questions',
+    '- Sports & Games: mix video games, real sports (different sport each), and board/card games',
     '',
     'Respond ONLY with: { "questions": [...] }',
   ].join('\n');
@@ -229,13 +249,13 @@ async function rewriteQuestion(q) {
   }
 }
 
-async function generateBatch(batchNum, focusCategories) {
+async function generateBatch(batchNum, focusCategories, usedTopics) {
   const response = await client.chat.completions.create({
     model: 'gpt-4o',
-    max_tokens: 8000,
+    max_tokens: 3000,
     messages: [
       { role: 'system', content: SYSTEM_PROMPT },
-      { role: 'user',   content: buildPrompt(batchNum, focusCategories) },
+      { role: 'user',   content: buildPrompt(batchNum, focusCategories, usedTopics) },
     ],
     response_format: { type: 'json_object' },
   });
@@ -297,20 +317,30 @@ async function refillBank(focusCategories) {
   if (isRefilling) { console.log('Refill already in progress'); return; }
   isRefilling = true;
   const before = await getUnusedCount();
-  const target = focusCategories ? 150 : REFILL_AMOUNT;
-  const batchesNeeded = Math.ceil(target / 50);
-  console.log('Starting refill — bank: ' + before + ', target: +' + target);
+  const target = focusCategories ? 100 : REFILL_AMOUNT;
+  // Smaller batches of ~10 questions each — more batches but far more diverse
+  const batchesNeeded = Math.ceil(target / 10);
+  console.log('Starting refill — bank: ' + before + ', target: +' + target + ' (' + batchesNeeded + ' small batches of ~10)');
 
   let totalAdded = 0;
+  const usedTopics = []; // tracks topics used across all batches this session
+
   try {
     for (let i = 1; i <= batchesNeeded; i++) {
-      console.log('   Generating batch ' + i + '/' + batchesNeeded + '...');
-      const questions = await generateBatch(i, focusCategories);
+      console.log('   Generating batch ' + i + '/' + batchesNeeded + ' (avoiding ' + usedTopics.length + ' used topics)...');
+      const questions = await generateBatch(i, focusCategories, usedTopics);
       const inserted  = await insertQuestions(questions);
       const count = parseInt(inserted) || 0;
       totalAdded += count;
-      console.log('   Batch ' + i + ': ' + count + ' inserted (' + (questions.length - count) + ' duplicates skipped)');
-      if (i < batchesNeeded) await new Promise(r => setTimeout(r, 1000));
+
+      // Add this batch's topics to memory so next batch avoids them
+      questions.forEach(q => {
+        // Extract key topic words from the answer as the "topic"
+        if (q.answer) usedTopics.push(q.answer);
+      });
+
+      console.log('   Batch ' + i + ': ' + count + ' inserted, ' + usedTopics.length + ' topics now in memory');
+      if (i < batchesNeeded) await new Promise(r => setTimeout(r, 800));
     }
     await logRefill(before, totalAdded, 'success');
     const after = await getUnusedCount();
