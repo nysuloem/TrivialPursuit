@@ -125,7 +125,7 @@ async function searchWeb(query) {
         tools,
         messages: [{
           role: 'user',
-          content: 'Search for: ' + query + '\n\nSummarise the most interesting, surprising, and specific facts you find. Focus on concrete facts with clear answers — names, numbers, dates, places. Return 3-5 bullet points of the most trivia-worthy facts.',
+          content: 'Search for: ' + query + '\n\nFind surprising but ACCESSIBLE facts — things that would make someone say "wow I didn\'t know that!" rather than "I could never have known that." Focus on facts with clear specific answers (names, numbers, dates, places) that a curious person might know or could reasonably guess from context. Return 4-6 bullet points of the most trivia-worthy accessible facts.',
         }],
       });
       const content = response.choices[0].message.content || '';
@@ -142,7 +142,7 @@ async function searchWeb(query) {
       max_tokens: 600,
       messages: [{
         role: 'user',
-        content: 'Using your knowledge, find surprising and specific trivia facts about: ' + query + '\n\nFocus on lesser-known, counterintuitive, or surprising facts — not the obvious well-known ones. Return 3-5 bullet points of concrete trivia-worthy facts with specific names, numbers, or dates.',
+        content: 'Using your knowledge, find surprising but ACCESSIBLE trivia facts about: ' + query + '\n\nFocus on facts that would make someone say "wow I didn\'t know that!" — surprising but not so obscure that only a specialist would know. A curious teen or engaged parent should have a fighting chance. Return 4-6 bullet points of concrete trivia-worthy facts with specific names, numbers, or dates.',
       }],
     });
     return response.choices[0].message.content || '';
@@ -160,13 +160,13 @@ async function generateQuestionsFromContent(category, content, count, isPieCateg
     : '';
 
   const pieInstruction = isPieCategory
-    ? 'Include exactly 1 pie question (is_pie: true) — harder, requires very specific knowledge.'
+    ? 'Include exactly 1 pie question (is_pie: true) — harder, requires very specific knowledge but still answerable by a dedicated fan or engaged parent.'
     : 'All questions should have is_pie: false.';
 
   const prompt = [
-    'Using ONLY the factual content below, write ' + count + ' trivia questions for the "' + category + '" category.',
+    'Using the factual content below as your SOURCE MATERIAL for topics and facts, write ' + count + ' trivia questions for the "' + category + '" category.',
     '',
-    '=== SOURCE MATERIAL ===',
+    '=== SOURCE MATERIAL (use these facts as inspiration) ===',
     content,
     '=== END SOURCE MATERIAL ===',
     '',
@@ -174,22 +174,39 @@ async function generateQuestionsFromContent(category, content, count, isPieCateg
     '',
     pieInstruction,
     '',
-    'Rules:',
-    '- Base questions ONLY on facts from the source material above — do not invent or add facts',
-    '- Apply the Bridge Principle: give enough context that both teens and parents have a chance',
-    '- SHORT ANSWERS: 1-5 words, ideally 1-3 words',
-    '- NO ANSWER LEAKAGE: answer word must not appear in the question',
-    '- NO BANNED ENDINGS: never end with "who is this?", "what is it?", "who is he/she?"',
-    '- Ask DIRECTLY: Which, Who, What, How many, In which city',
-    '- NO "as of [year]" phrasing',
-    '- Mark canadian:true only if specifically about Canada',
+    '=== GETTABILITY RULE — CRITICAL ===',
+    'Every question must be answerable by at least ONE person in a typical Canadian family (teen, parent, or grandparent).',
+    'Before writing each question ask: "Would a reasonably curious person know this, or could they figure it out from the context clues in the question?"',
+    'If the answer is "only a narrow specialist would know this" — rewrite it with more helpful context, or pick a different fact from the source material.',
+    'The best questions are ones where people ALMOST know the answer — they feel achievable but satisfying to get right.',
+    '',
+    '=== WRITING RULES ===',
+    'BANNED ENDINGS: Never end with "what is it?", "who is this?", "who is he/she?", "what are they?", "name this..."',
+    'Ask DIRECTLY: Which, Who, What, How many, In which city, Name the',
+    '',
+    'BAD:  "This singer broke a Grammy record recently — who is she?"',
+    'GOOD: "Which Canadian singer swept the 2024 Grammys by winning four awards in a single night, including Album of the Year?"',
+    '',
+    'SHORT ANSWERS: 1-5 words, ideally 1-3. One clear unambiguous answer.',
+    'NO ANSWER LEAKAGE: The answer word must not appear anywhere in the question text.',
+    'NO AS-OF PHRASING: Never write "as of 2024", "currently". State years naturally.',
+    'BRIDGE PRINCIPLE: Give enough context that both teens AND parents have a fighting chance.',
+    '',
+    '=== GENERATIONAL MIX for ' + category + ' ===',
+    category === 'TV, Movies & Music'
+      ? 'Lean toward 2020-2025 content but include 2-3 classic era questions (70s/80s/90s) so parents can shine too.'
+      : category === 'Pop Culture'
+      ? 'Lean heavily toward 2020-2025 teen-friendly content. Max 1-2 retro questions.'
+      : 'Mix across different eras, cultures, and sub-topics for broad appeal.',
+    '',
+    'Mark canadian:true only if specifically about Canada.',
     '',
     'Respond ONLY with valid JSON: { "questions": [...] }',
   ].join('\n');
 
   const response = await client.chat.completions.create({
     model: 'gpt-4o',
-    max_tokens: 1500,
+    max_tokens: 2000,
     messages: [
       { role: 'system', content: QUESTION_SYSTEM_PROMPT },
       { role: 'user', content: prompt },
@@ -197,7 +214,7 @@ async function generateQuestionsFromContent(category, content, count, isPieCateg
     response_format: { type: 'json_object' },
   });
 
-  const text = response.choices[0].message.content || '';
+  const text = response.choices[0]?.message?.content || '{}';
   const obj = JSON.parse(text);
   const arrays = Object.values(obj).filter(v => Array.isArray(v));
   return arrays.length > 0 ? arrays[0] : [];
