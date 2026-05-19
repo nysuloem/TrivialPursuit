@@ -55,6 +55,12 @@ const QUESTION_SYSTEM_PROMPT = [
   '',
   'NO AS-OF PHRASING: Never write "as of 2024", "currently", "at the time". State years naturally in context.',
   '',
+  '=== GEOGRAPHIC & CULTURAL RELEVANCE ===',
+  '- 70% of questions should cover North American culture, history, sports, and entertainment (US and Canada)',
+  '- 30% can be global — but only topics a North American family would actually know: World Cup, Beatles, Olympics, world geography taught in school, globally famous figures',
+  '- AVOID: obscure foreign politicians, local sports leagues outside North America, cultural references only meaningful to people from one specific country',
+  '- Canadian content: aim for about 15% — woven naturally into categories. Mark canadian:true.',
+  '',
   '=== OUTPUT ===',
   'Respond ONLY with valid JSON, no markdown, no code blocks:',
   '{ "questions": [ { "category": "...", "question": "...", "answer": "...", "is_pie": false, "canadian": false } ] }',
@@ -69,7 +75,8 @@ async function generateSearchQueries(category, usedTopics) {
 
   const prompt = [
     'Generate 4 specific, creative web search queries to find interesting trivia material for the "' + category + '" category of a family trivia game.',
-    'The queries should find surprising, counterintuitive, or little-known facts spanning different cultures and time periods.',
+    'The queries should find surprising, counterintuitive, or little-known facts that a North American family would find interesting.',
+    'Bias toward US and Canadian content (70%) but include some globally relevant topics (30%) that North Americans would know.',
     'Category guidance: ' + CATEGORY_SEARCH_GUIDANCE[category],
     avoidList,
     'Make each query specific — not generic like "interesting facts about history".',
@@ -200,6 +207,7 @@ async function generateQuestionsFromContent(category, content, count, isPieCateg
       : 'Mix across different eras, cultures, and sub-topics for broad appeal.',
     '',
     'Mark canadian:true only if specifically about Canada.',
+    'AIM FOR 70% North American content, 30% globally relevant topics a North American would know.',
     '',
     'Respond ONLY with valid JSON: { "questions": [...] }',
   ].join('\n');
