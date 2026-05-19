@@ -68,32 +68,44 @@ async function generateSearchQueries(category, usedTopics) {
 
   const prompt = [
     'Generate 4 specific, creative web search queries to find interesting trivia material for the "' + category + '" category of a family trivia game.',
-    '',
-    'The queries should find:',
-    '- Surprising, counterintuitive, or little-known facts',
-    '- A mix of recent (2023-2024) and timeless content',
-    '- Content spanning different cultures, countries, and time periods',
-    '- Things that would genuinely surprise both teenagers and their parents',
-    '- AVOID obvious well-known topics — go for the unexpected angle',
-    '',
+    'The queries should find surprising, counterintuitive, or little-known facts spanning different cultures and time periods.',
     'Category guidance: ' + CATEGORY_SEARCH_GUIDANCE[category],
     avoidList,
-    '',
-    'Make each query specific enough to find a unique angle — not generic like "interesting facts about history".',
-    'Think like a curious researcher looking for the most surprising and engaging content possible.',
-    '',
+    'Make each query specific — not generic like "interesting facts about history".',
     'Respond ONLY with valid JSON: { "queries": ["query1", "query2", "query3", "query4"] }',
   ].join('\n');
 
-  const response = await client.chat.completions.create({
-    model: 'gpt-4o',
-    max_tokens: 300,
-    messages: [{ role: 'user', content: prompt }],
-    response_format: { type: 'json_object' },
-  });
+  try {
+    const response = await client.chat.completions.create({
+      model: 'gpt-4o',
+      max_tokens: 300,
+      messages: [{ role: 'user', content: prompt }],
+      response_format: { type: 'json_object' },
+    });
 
-  const result = JSON.parse(response.choices[0].message.content || '{}');
-  return result.queries || [];
+    const text = response.choices[0]?.message?.content || '{}';
+    const result = JSON.parse(text);
+
+    // Handle various response formats
+    if (Array.isArray(result.queries) && result.queries.length > 0) return result.queries;
+    if (Array.isArray(result.questions)) return result.questions;
+    // Find any array in the response
+    const anyArray = Object.values(result).find(v => Array.isArray(v) && v.length > 0);
+    if (anyArray) return anyArray;
+
+    // Fallback — generate default queries for this category
+    console.log('     Query generation returned unexpected format, using defaults');
+    return [
+      'surprising little-known facts ' + category + ' 2024',
+      'unusual ' + category.toLowerCase() + ' records and firsts',
+    ];
+  } catch (e) {
+    console.log('     Query generation failed: ' + e.message + ' — using defaults');
+    return [
+      'surprising little-known facts ' + category + ' 2024',
+      'unusual ' + category.toLowerCase() + ' records and firsts',
+    ];
+  }
 }
 
 // Step 2: Search the web for fresh content
