@@ -786,6 +786,7 @@ function StealScreen({ stealingTeamIdx, category, question, onCorrect, onWrong }
 export default function Game() {
   const audioCtxRef    = useRef(null);
   const pendingAudioRef = useRef(null);
+  const activeTeamRef   = useRef(0); // always current, never stale
 
   // Lazily init audio context on first user interaction
   const getAudio = () => {
@@ -814,6 +815,9 @@ export default function Game() {
   const [selectedVoice, setSelectedVoice] = useState('auto'); // auto = rotate by team
   const [finalTeam,     setFinalTeam]     = useState(null);
   const [finalUsedCats, setFinalUsedCats] = useState([]);
+
+  // Keep ref in sync so voice selection never uses stale closure
+  useEffect(() => { activeTeamRef.current = active; }, [active]);
 
   useEffect(() => {
     getBankCount().then(d => setBankCount(d.count)).catch(() => {});
@@ -854,10 +858,10 @@ export default function Game() {
     if (!text) return;
     setSpeaking(true);
 
-    // If manual voice override is set, use it; otherwise auto-pick by team
+    // Use passed teamIdx, or fall back to ref (never stale), never use active state directly
     let voice = selectedVoice;
     if (!selectedVoice || selectedVoice === 'auto') {
-      const team = teamIdx !== undefined ? teamIdx : active;
+      const team = teamIdx !== undefined ? teamIdx : activeTeamRef.current;
       const voices = TEAM_VOICES[team];
       voice = voices[voiceIndexRef[team] % voices.length];
       voiceIndexRef[team] = (voiceIndexRef[team] + 1) % voices.length;
@@ -870,7 +874,7 @@ export default function Game() {
       () => setSpeaking(false),
       () => setSpeaking(false),
     );
-  }, [selectedVoice, active]);
+  }, [selectedVoice]);
 
   // Auto-read question aloud when new question loads — uses pre-fetched audio
   useEffect(() => {
@@ -934,13 +938,13 @@ export default function Game() {
       setQuestion(data.question);
       setRevealed(false);
 
-      // Start pre-fetching audio immediately using correct team voice
+      // Start pre-fetching audio using ref to guarantee correct team
+      const currentTeam = activeTeamRef.current;
       const ttsVoice = (selectedVoice && selectedVoice !== 'auto')
         ? selectedVoice
-        : TEAM_VOICES[active][voiceIndexRef[active] % TEAM_VOICES[active].length];
-      // Advance the voice index now so it's consistent
+        : TEAM_VOICES[currentTeam][voiceIndexRef[currentTeam] % TEAM_VOICES[currentTeam].length];
       if (!selectedVoice || selectedVoice === 'auto') {
-        voiceIndexRef[active] = (voiceIndexRef[active] + 1) % TEAM_VOICES[active].length;
+        voiceIndexRef[currentTeam] = (voiceIndexRef[currentTeam] + 1) % TEAM_VOICES[currentTeam].length;
       }
 
       const BASE = process.env.REACT_APP_API_URL || '';
