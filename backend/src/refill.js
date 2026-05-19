@@ -62,8 +62,9 @@ const QUESTION_SYSTEM_PROMPT = [
 
 // Step 1: Ask GPT to generate creative search queries for a category
 async function generateSearchQueries(category, usedTopics) {
-  const avoidList = usedTopics.length > 0
-    ? 'Avoid searches that would find content about: ' + usedTopics.slice(-40).join(', ') + '.'
+  const safeTopics = Array.isArray(usedTopics) ? usedTopics : [];
+  const avoidList = safeTopics.length > 0
+    ? 'Avoid searches that would find content about: ' + safeTopics.slice(-40).join(', ') + '.'
     : '';
 
   const prompt = [
@@ -153,8 +154,9 @@ async function searchWeb(query) {
 
 // Step 3: Generate questions from the web search results
 async function generateQuestionsFromContent(category, content, count, isPieCategory, usedTopics) {
-  const avoidList = usedTopics.length > 0
-    ? 'TOPICS ALREADY USED — do not write questions about: ' + usedTopics.slice(-60).join(', ')
+  const safeTopics2 = Array.isArray(usedTopics) ? usedTopics : [];
+  const avoidList = safeTopics2.length > 0
+    ? 'TOPICS ALREADY USED — do not write questions about: ' + safeTopics2.slice(-60).join(', ')
     : '';
 
   const pieInstruction = isPieCategory
@@ -351,7 +353,7 @@ async function refillBank(focusCategories) {
 
   try {
     for (let i = 1; i <= batchesNeeded; i++) {
-      console.log('   === Batch ' + i + '/' + batchesNeeded + ' (topic memory: ' + usedTopics.length + ' items) ===');
+      console.log('   === Batch ' + i + '/' + batchesNeeded + ' (topic memory: ' + (Array.isArray(usedTopics) ? usedTopics.length : 0) + ' items) ===');
       const questions = await generateBatch(i, focusCategories, usedTopics);
       const inserted = await insertQuestions(questions);
       const count = parseInt(inserted) || 0;
