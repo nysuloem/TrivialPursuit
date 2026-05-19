@@ -193,6 +193,42 @@ function answerInQuestion(question, answer) {
   return answerWords.some(word => q.includes(word));
 }
 
+async function rewriteQuestion(q) {
+  try {
+    const prompt = [
+      'This trivia question has a problem: the answer word appears in the question text, which gives it away.',
+      '',
+      'Category: ' + q.category,
+      'Original question: ' + q.question,
+      'Answer: ' + q.answer,
+      '',
+      'Rewrite the question so that:',
+      '1. The answer word "' + q.answer + '" does NOT appear anywhere in the question',
+      '2. The question is still about the same topic/subject',
+      '3. It uses a DIFFERENT interesting fact as the hook — not a description of the answer itself',
+      '4. It ends with a direct specific question (not "what is it?" or "who is this?")',
+      '5. It still sounds like a Trivial Pursuit question',
+      '',
+      'Respond ONLY with valid JSON: { "question": "rewritten question here" }',
+    ].join('\n');
+
+    const response = await client.chat.completions.create({
+      model: 'gpt-4o',
+      max_tokens: 400,
+      messages: [{ role: 'user', content: prompt }],
+      response_format: { type: 'json_object' },
+    });
+
+    const result = JSON.parse(response.choices[0].message.content || '{}');
+    if (result.question && !answerInQuestion(result.question, q.answer)) {
+      return { ...q, question: result.question.trim() };
+    }
+    return null; // rewrite still failed
+  } catch (e) {
+    return null;
+  }
+}
+
 async function generateBatch(batchNum, focusCategories) {
   const response = await client.chat.completions.create({
     model: 'gpt-4o',
@@ -214,7 +250,7 @@ async function generateBatch(batchNum, focusCategories) {
     parsed = arrays.length > 0 ? arrays[0] : [];
   }
 
-  const validated = parsed
+  const mapped = parsed
     .map(q => {
       const cat = normalizeCategory(q.category);
       if (!cat || !q.question || !q.answer) return null;
@@ -225,17 +261,36 @@ async function generateBatch(batchNum, focusCategories) {
         is_pie:   q.is_pie === true,
         canadian: q.canadian === true,
       };
-    })
-    .filter(Boolean)
-    .filter(q => {
-      if (answerInQuestion(q.question, q.answer)) {
-        console.log('   Rejected (answer in question): "' + q.answer + '"');
-        return false;
-      }
-      return true;
     });
 
-  return validated;
+  // Separate clean questions from ones that need rewriting
+  const clean = [];
+  const needsRewrite = [];
+
+  for (const q of mapped) {
+    if (!q) continue;
+    if (answerInQuestion(q.question, q.answer)) {
+      console.log('   Rewriting (answer in question): "' + q.answer + '"');
+      needsRewrite.push(q);
+    } else {
+      clean.push(q);
+    }
+  }
+
+  // Attempt rewrites in parallel
+  if (needsRewrite.length > 0) {
+    const rewritten = await Promise.all(needsRewrite.map(q => rewriteQuestion(q)));
+    rewritten.forEach((q, i) => {
+      if (q) {
+        console.log('   Rewrite succeeded: "' + q.answer + '"');
+        clean.push(q);
+      } else {
+        console.log('   Rewrite failed, discarding: "' + needsRewrite[i].answer + '"');
+      }
+    });
+  }
+
+  return clean;
 }
 
 async function refillBank(focusCategories) {
