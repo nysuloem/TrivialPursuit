@@ -18,174 +18,175 @@ const DISTRIBUTION = {
   'Pop Culture':        { regular: 10, pie: 1 },
 };
 
-// Per-category counts for small batches of 10
-const SMALL_BATCH = {
-  'Geography':          { regular: 1, pie: 0 },
-  'TV, Movies & Music': { regular: 2, pie: 0 },
-  'History':            { regular: 1, pie: 0 },
-  'Science & Nature':   { regular: 1, pie: 0 },
-  'Sports & Games':     { regular: 2, pie: 0 },
-  'Pop Culture':        { regular: 2, pie: 0 },
-  // One random category gets the pie question per batch
+// Category-specific guidance for search query generation
+const CATEGORY_SEARCH_GUIDANCE = {
+  'Geography': 'surprising geography facts, unusual borders, places that changed names, extreme geography records, bizarre territorial anomalies, unexpected climate facts, islands nobody knows about',
+  'TV, Movies & Music': 'recent streaming shows 2024, new music releases 2024, viral TV moments, surprising music records, behind the scenes film facts, unexpected casting decisions, recent award show moments',
+  'History': 'bizarre historical facts that sound made up, unexpected causes of famous events, strange historical coincidences, surprising firsts in history, weird historical laws, obscure events that changed the world',
+  'Science & Nature': 'surprising scientific discoveries 2024, weird animal behaviors, unexpected physics facts, strange chemistry facts, recent space discoveries, bizarre medical facts, record-breaking natural phenomena',
+  'Sports & Games': 'surprising sports records 2024, obscure Olympic facts, unexpected video game records, strange board game history, unusual sports moments, recent esports milestones, weird sports rules',
+  'Pop Culture': 'viral moments teenagers 2024, surprising celebrity facts, unexpected internet trends 2024, behind the scenes streaming show facts, surprising music industry facts, Gen Z cultural moments 2024',
 };
 
-const SYSTEM_PROMPT = [
+const QUESTION_SYSTEM_PROMPT = [
   'You are an expert trivia writer crafting questions for a Canadian family Trivial Pursuit-style board game.',
   'Players span three generations: Teenagers (13-18), Gen X Parents (40-55), and Boomers (60+).',
   '',
   '=== THE BRIDGE PRINCIPLE ===',
   'The best questions give enough context that an older player can guess a teen answer, and vice versa.',
-  'A question about MrBeast should hint at what he does so a Boomer has a fighting chance.',
-  'A question about The Beatles should be framed so a teenager finds it interesting, not just a date quiz.',
   '',
-  '=== RULE #1 — BANNED QUESTION ENDINGS ===',
-  'NEVER end a question with vague trailing phrases like:',
-  '"what is it?" "who is it?" "what is this?" "who is this?" "who is he/she?"',
-  '"what are they?" "name this..." "what is this called?" "who is the pop star?" "who is this athlete?"',
+  '=== BANNED QUESTION ENDINGS ===',
+  'NEVER end with: "what is it?" "who is it?" "what is this?" "who is this?" "who is he/she?" "name this..."',
+  'Instead ask DIRECTLY: Which, Who, What, How many, In which city, Name the',
   '',
-  'Instead, ask DIRECTLY and SPECIFICALLY using: Which, Who, What, How many, In which city, Name the',
-  '',
-  'BAD:  "She won four Grammy Awards and is known for her powerful voice — who is this singer?"',
+  'BAD:  "She won four Grammys — who is this singer?"',
   'GOOD: "Which pop star made history at the 2010 Grammys by becoming the first female artist to win Album of the Year twice?"',
   '',
-  'BAD:  "This game lets players build anything from blocks — what is it called?"',
-  'GOOD: "Which sandbox building game, created by Markus Persson in 2011, became the best-selling video game of all time?"',
-  '',
-  'BAD:  "He surpassed Kareems record in 2023 to lead the NBA all time in scoring — who is he?"',
-  'GOOD: "Which Lakers star surpassed Kareem Abdul-Jabbars long-standing record in February 2023 to become the NBAs all-time leading scorer?"',
-  '',
-  '=== WRITE LIKE TRIVIAL PURSUIT ===',
-  'Questions open with a compelling hook or surprising fact, then close with a crisp direct question.',
-  'They teach you something even when you get them wrong.',
-  '',
-  'EXAMPLE 1 (Geography):',
-  'Q: "Once known as Rhodesia, this landlocked southern African nation peacefully gained independence from Britain in 1980 — what is it called today?"',
-  'A: Zimbabwe',
-  '',
-  'EXAMPLE 2 (TV, Movies & Music):',
-  'Q: "Before winning four Emmy Awards for playing a chemistry teacher turned drug kingpin, this actor spent years as the lovable bumbling dad on Malcolm in the Middle — which acclaimed AMC drama gave him that iconic darker role?"',
-  'A: Breaking Bad',
-  '',
-  'EXAMPLE 3 (History):',
-  'Q: "Triggered by the assassination of Archduke Franz Ferdinand in Sarajevo in 1914, this global conflict dragged in most of the worlds major powers and claimed over 17 million lives — by what common name do we know it?"',
-  'A: World War I',
-  '',
-  'EXAMPLE 4 (Pop Culture):',
-  'Q: "Known for jaw-dropping stunts like burying himself alive and giving away private islands, which YouTube creator became the most subscribed individual channel on the platform?"',
-  'A: MrBeast',
-  '',
   '=== CORE RULES ===',
+  'SHORT ANSWERS: Maximum 5 words, ideally 1-3. One clear unambiguous answer.',
   '',
-  'SHORT ANSWERS: Maximum 5 words, ideally 1-3 words. One clear unambiguous answer.',
-  'BAD answer: "The Battle of Thermopylae, 480 BC, fought by King Leonidas of Sparta"',
-  'GOOD answer: "Battle of Thermopylae" or "Leonidas"',
-  '',
-  'NO ANSWER LEAKAGE — the answer must NEVER appear in the question:',
-  '- BAD: "Which TikTok trend used The Real Roxannes dance song?" Answer: "The Roxanne Trend" (Roxanne in both)',
-  '- BAD: "The Mongol Empire stretched from the Pacific to Eastern Europe — who founded the Mongol Empire?" (Mongol repeated)',
-  '- BAD: "Rosa Parks refused to give up her seat, sparking the Montgomery Bus Boycott — what was the boycott called?" (answer in question)',
-  '- Before submitting each question, ask: does any word in my question appear in the answer? If yes, rewrite.',
+  'NO ANSWER LEAKAGE: The answer word must NEVER appear in the question.',
+  '- BAD: "Which TikTok trend used The Real Roxannes dance?" Answer: "Roxanne Trend" (Roxanne in both)',
+  '- BAD: "Rosa Parks sparked the Montgomery Bus Boycott — what was the boycott called?" (answer in question)',
   '',
   'NEVER DESCRIBE THE ANSWER THEN ASK WHAT IT IS:',
-  '- The context hook must reveal a DIFFERENT fact about the subject, not describe the answer itself.',
-  '- BAD: "Although he played a meth-cooking chemistry teacher, Bryan Cranston is best known for which TV series?" (that IS Breaking Bad)',
-  '- GOOD: "Bryan Cranston spent years playing the lovable bumbling dad Hal on Malcolm in the Middle — which later AMC role won him four Emmy Awards?"',
+  '- BAD: "Although he played a meth-cooking teacher, Bryan Cranston is best known for which TV series?" (that IS Breaking Bad)',
+  '- GOOD: "Bryan Cranston spent years as the bumbling dad on Malcolm in the Middle — which later AMC role won him four Emmy Awards?"',
   '',
-  'NO AS-OF-YEAR PHRASING:',
-  '- NEVER write: "as of 2024", "as of this writing", "currently", "at the time of publication"',
-  '- Write timeless facts: "Who holds the all-time record..." not "As of 2024, who holds..."',
-  '- For dated events state the year naturally in context: "In 2023, which country..." not "As of 2023..."',
-  '',
-  'RADICAL DIVERSITY — every question in a batch must cover a different subject:',
-  '- NEVER feature the same person, franchise, team, band, show, sport, or platform twice in one batch',
-  '- If one question mentions Taylor Swift, no other question can reference Travis Kelce, the Eras Tour, or the NFL',
-  '- Rotate wildly across sub-genres within each category',
-  '',
-  '=== CATEGORY BLUEPRINTS ===',
-  '',
-  'GEOGRAPHY (50% fun/surprising, 50% knowledge-based):',
-  '- Fun/surprising: weird country facts, unexpected borders, bizarre place names, geography records, islands nobody knows, countries that changed names, cities with unexpected climates, territorial oddities',
-  '- Knowledge-based: capitals, major rivers, mountain ranges, bodies of water, continents',
-  '- Rotate types every question: capitals, rivers, mountains, deserts, islands, borders, flags, natural wonders, nicknames — never repeat a type',
-  '',
-  'HISTORY (50% fun/surprising, 50% knowledge-based):',
-  '- Fun/surprising: bizarre historical facts, strange laws that existed, surprising firsts, great historical accidents, unexpected causes of famous events, famous last words, odd connections between events (e.g. Pepsi briefly owning Soviet warships)',
-  '- Knowledge-based: leaders, battles, treaties, movements, key dates',
-  '- Rotate eras every question: ancient, medieval, Age of Exploration, World Wars, Cold War, civil rights, modern (2000s)',
-  '',
-  'SCIENCE & NATURE:',
-  '- Rotate heavily every question: space/astronomy, human anatomy, chemistry, physics, biology, geology, weather, AI/technology, medicine, animal adaptations, plants, ocean life, environmental science, inventions, mathematics',
-  '',
-  'TV, MOVIES & MUSIC — teen-friendly FIRST, older content sprinkled in:',
-  '- REQUIRED: Generate 2020-2025 questions FIRST. At least 5 out of 10 must be from 2020-2025.',
-  '- 2020-2025 (5+ questions): The Bear, Succession, Wednesday, Euphoria, House of the Dragon, The Last of Us, Severance, Stranger Things, Squid Game, White Lotus, Abbott Elementary, Olivia Rodrigo, Sabrina Carpenter, SZA, Bad Bunny, Kendrick Lamar, The Weeknd, Taylor Swift Eras Tour, Chappell Roan, Billie Eilish, BTS, Barbie movie, Oppenheimer, Top Gun Maverick, Everything Everywhere All At Once',
-  '- 80s sprinkle (2 questions): Michael Jackson, Madonna, Prince, Back to the Future, ET, Die Hard, Cheers, Miami Vice',
-  '- 90s/2000s sprinkle (2 questions): Friends, The Sopranos, Eminem, Britney Spears, Lord of the Rings, The Office, Breaking Bad, Nirvana',
-  '- 70s sprinkle (1 question only): Star Wars, Fleetwood Mac, ABBA, Jaws, Saturday Night Fever, Grease',
-  '- TV must make up at least 40% of questions — ask about specific catchphrases, characters, plot twists, casting choices, spinoffs',
-  '- Apply the Bridge Principle: frame older questions with hooks that give teens a fighting chance, frame newer questions with context hooks so parents can attempt them',
-  '',
-  'SPORTS & GAMES (strict counts per batch of 10):',
-  '- Exactly 4 VIDEO GAME questions: massive modern titles AND retro mainstays. Rotate: Fortnite, Roblox, Minecraft, GTA, Zelda, Mario, Call of Duty, Elden Ring, Pokemon, Among Us, Valorant, Pac-Man, Tetris, Sonic, Donkey Kong',
-  '- Exactly 4 SPORTS questions: rotate across COMPLETELY DIFFERENT sports. Cover NFL, NBA, NHL, MLB, F1, Olympics, Tennis, Soccer, Boxing, Cricket, Golf, Rugby. Never the same sport twice in one batch.',
-  '- Exactly 2 TRADITIONAL GAME questions: Monopoly, Scrabble, chess, Risk, Poker, Magic: The Gathering, Dungeons and Dragons, game shows, Wordle, crossword puzzles',
-  '',
-  'POP CULTURE — teen-first, older content is a small sprinkle only:',
-  '- REQUIRED: Generate teen content FIRST. 7-8 out of 10 must be things a 15-year-old immediately recognizes.',
-  '- Teen content 2020-2025 (7-8 questions): celebrity drama (Taylor/Travis, Selena/Hailey, Will Smith slap, Kanye controversies, Zendaya), viral moments (Grimace shake, Stanley cups, Wednesday dance, Barbie cultural moment), Gen Z news (climate strikes, AI going mainstream, COVID culture, Ukraine war reactions), TikTok creators (MrBeast, Charli D Amelio), gaming crossovers (Fortnite Travis Scott concert, Among Us politicians), award show moments, Caitlin Clark rise, Simone Biles comeback, LeBron scoring record',
-  '- Older sprinkle (2-3 questions MAX): Watergate, moon landing as cultural event, disco era, MTV launch 1981, Rubiks Cube craze, Pac-Man fever, VHS vs Betamax, Y2K panic, Live Aid',
-  '- NEVER start a Pop Culture batch with a retro question — always lead with teen content',
-  '- MAX 2 social media platform questions per batch',
-  '- Only ask about things that were genuinely massive — if it did not make mainstream news or get tens of millions of views, skip it',
-  '',
-  'CANADIAN CONTENT: Exactly 10% of questions should highlight Canadian achievement, geography, or history. Mark these canadian:true.',
+  'NO AS-OF PHRASING: Never write "as of 2024", "currently", "at the time". State years naturally in context.',
   '',
   '=== OUTPUT ===',
-  'Respond ONLY with valid JSON, no markdown, no code blocks, no explanation:',
+  'Respond ONLY with valid JSON, no markdown, no code blocks:',
   '{ "questions": [ { "category": "...", "question": "...", "answer": "...", "is_pie": false, "canadian": false } ] }',
 ].join('\n');
 
-function buildPrompt(batchNum, focusCategories, usedTopics) {
-  let catInstructions;
-  if (focusCategories && focusCategories.length > 0) {
-    catInstructions = focusCategories
-      .map(cat => '- "' + cat + '": 2 regular questions + 1 pie question')
-      .join('\n');
-  } else {
-    // Small batch of ~10 questions, one pie question in a random category
-    const pieCategory = CATEGORIES[batchNum % CATEGORIES.length];
-    catInstructions = Object.entries(SMALL_BATCH)
-      .map(([cat, counts]) => {
-        const pie = cat === pieCategory ? 1 : 0;
-        return '- "' + cat + '": ' + counts.regular + ' regular question' + (counts.regular > 1 ? 's' : '') + (pie ? ' + 1 pie question' : '');
-      })
-      .join('\n');
-  }
-
-  const topicMemory = usedTopics && usedTopics.length > 0
-    ? '\nTOPICS ALREADY USED THIS SESSION — do NOT repeat any of these subjects, people, shows, or events:\n' +
-      usedTopics.slice(-80).map(t => '- ' + t).join('\n') + '\n'
+// Step 1: Ask GPT to generate creative search queries for a category
+async function generateSearchQueries(category, usedTopics) {
+  const avoidList = usedTopics.length > 0
+    ? 'Avoid searches that would find content about: ' + usedTopics.slice(-40).join(', ') + '.'
     : '';
 
-  return [
-    'BATCH ' + batchNum + ' — Generate trivia questions with this exact distribution:',
-    catInstructions,
-    topicMemory,
-    'CRITICAL BATCH REMINDERS:',
-    '- RADICAL DIVERSITY: Every question must be about something completely different from all other questions in this batch AND from the topics listed above',
-    '- Dig DEEP into your knowledge — avoid obvious well-known examples. If Science gives you gravity or photosynthesis, reject that instinct and find something more interesting.',
-    '- SHORT ANSWERS: 1-5 words max, ideally 1-3 words, one clear answer',
-    '- NO ANSWER LEAKAGE: The answer word must not appear anywhere in the question text',
-    '- NO BANNED ENDINGS: Never end with "who is this?", "what is it?", "who is he/she?" — ask DIRECTLY',
-    '- NO AS-OF PHRASING: Write timeless facts or state the year naturally',
-    '- BRIDGE PRINCIPLE: Frame modern questions so older players can attempt them; frame retro questions so teens find them interesting',
-    '- Geography/History: 50% fun surprising facts, 50% knowledge-based',
-    '- Pop Culture: lead with teen 2020-2025 content; max 2-3 retro per full batch',
-    '- TV Movies Music: lead with 2020-2025 content; TV must be 40% of questions',
-    '- Sports & Games: mix video games, real sports (different sport each), and board/card games',
+  const prompt = [
+    'Generate 4 specific, creative web search queries to find interesting trivia material for the "' + category + '" category of a family trivia game.',
     '',
-    'Respond ONLY with: { "questions": [...] }',
+    'The queries should find:',
+    '- Surprising, counterintuitive, or little-known facts',
+    '- A mix of recent (2023-2024) and timeless content',
+    '- Content spanning different cultures, countries, and time periods',
+    '- Things that would genuinely surprise both teenagers and their parents',
+    '- AVOID obvious well-known topics — go for the unexpected angle',
+    '',
+    'Category guidance: ' + CATEGORY_SEARCH_GUIDANCE[category],
+    avoidList,
+    '',
+    'Make each query specific enough to find a unique angle — not generic like "interesting facts about history".',
+    'Think like a curious researcher looking for the most surprising and engaging content possible.',
+    '',
+    'Respond ONLY with valid JSON: { "queries": ["query1", "query2", "query3", "query4"] }',
   ].join('\n');
+
+  const response = await client.chat.completions.create({
+    model: 'gpt-4o',
+    max_tokens: 300,
+    messages: [{ role: 'user', content: prompt }],
+    response_format: { type: 'json_object' },
+  });
+
+  const result = JSON.parse(response.choices[0].message.content || '{}');
+  return result.queries || [];
+}
+
+// Step 2: Search the web for fresh content
+async function searchWeb(query) {
+  // Try with web search tool first
+  const searchTools = [
+    [{ type: 'web_search_preview' }],
+    [{ type: 'web_search_preview_2025_03_11' }],
+  ];
+
+  for (const tools of searchTools) {
+    try {
+      const response = await client.chat.completions.create({
+        model: 'gpt-4o',
+        max_tokens: 800,
+        tools,
+        messages: [{
+          role: 'user',
+          content: 'Search for: ' + query + '\n\nSummarise the most interesting, surprising, and specific facts you find. Focus on concrete facts with clear answers — names, numbers, dates, places. Return 3-5 bullet points of the most trivia-worthy facts.',
+        }],
+      });
+      const content = response.choices[0].message.content || '';
+      if (content.length > 50) return content;
+    } catch (e) {
+      // Try next tool format
+    }
+  }
+
+  // Fallback: ask GPT to use its own knowledge on this specific query
+  try {
+    const response = await client.chat.completions.create({
+      model: 'gpt-4o',
+      max_tokens: 600,
+      messages: [{
+        role: 'user',
+        content: 'Using your knowledge, find surprising and specific trivia facts about: ' + query + '\n\nFocus on lesser-known, counterintuitive, or surprising facts — not the obvious well-known ones. Return 3-5 bullet points of concrete trivia-worthy facts with specific names, numbers, or dates.',
+      }],
+    });
+    return response.choices[0].message.content || '';
+  } catch (e) {
+    console.log('   Search fallback also failed: ' + e.message);
+    return '';
+  }
+}
+
+// Step 3: Generate questions from the web search results
+async function generateQuestionsFromContent(category, content, count, isPieCategory, usedTopics) {
+  const avoidList = usedTopics.length > 0
+    ? 'TOPICS ALREADY USED — do not write questions about: ' + usedTopics.slice(-60).join(', ')
+    : '';
+
+  const pieInstruction = isPieCategory
+    ? 'Include exactly 1 pie question (is_pie: true) — harder, requires very specific knowledge.'
+    : 'All questions should have is_pie: false.';
+
+  const prompt = [
+    'Using ONLY the factual content below, write ' + count + ' trivia questions for the "' + category + '" category.',
+    '',
+    '=== SOURCE MATERIAL ===',
+    content,
+    '=== END SOURCE MATERIAL ===',
+    '',
+    avoidList,
+    '',
+    pieInstruction,
+    '',
+    'Rules:',
+    '- Base questions ONLY on facts from the source material above — do not invent or add facts',
+    '- Apply the Bridge Principle: give enough context that both teens and parents have a chance',
+    '- SHORT ANSWERS: 1-5 words, ideally 1-3 words',
+    '- NO ANSWER LEAKAGE: answer word must not appear in the question',
+    '- NO BANNED ENDINGS: never end with "who is this?", "what is it?", "who is he/she?"',
+    '- Ask DIRECTLY: Which, Who, What, How many, In which city',
+    '- NO "as of [year]" phrasing',
+    '- Mark canadian:true only if specifically about Canada',
+    '',
+    'Respond ONLY with valid JSON: { "questions": [...] }',
+  ].join('\n');
+
+  const response = await client.chat.completions.create({
+    model: 'gpt-4o',
+    max_tokens: 1500,
+    messages: [
+      { role: 'system', content: QUESTION_SYSTEM_PROMPT },
+      { role: 'user', content: prompt },
+    ],
+    response_format: { type: 'json_object' },
+  });
+
+  const text = response.choices[0].message.content || '';
+  const obj = JSON.parse(text);
+  const arrays = Object.values(obj).filter(v => Array.isArray(v));
+  return arrays.length > 0 ? arrays[0] : [];
 }
 
 function normalizeCategory(cat) {
@@ -216,25 +217,20 @@ function answerInQuestion(question, answer) {
 async function rewriteQuestion(q) {
   try {
     const prompt = [
-      'This trivia question has a problem: the answer word appears in the question text, which gives it away.',
-      '',
+      'This trivia question has a problem: the answer word appears in the question text.',
       'Category: ' + q.category,
       'Original question: ' + q.question,
       'Answer: ' + q.answer,
       '',
-      'Rewrite the question so that:',
-      '1. The answer word "' + q.answer + '" does NOT appear anywhere in the question',
-      '2. The question is still about the same topic/subject',
-      '3. It uses a DIFFERENT interesting fact as the hook — not a description of the answer itself',
-      '4. It ends with a direct specific question (not "what is it?" or "who is this?")',
-      '5. It still sounds like a Trivial Pursuit question',
+      'Rewrite the question so the answer "' + q.answer + '" does NOT appear in the question.',
+      'Use a DIFFERENT interesting fact as the hook. End with a direct specific question.',
       '',
       'Respond ONLY with valid JSON: { "question": "rewritten question here" }',
     ].join('\n');
 
     const response = await client.chat.completions.create({
       model: 'gpt-4o',
-      max_tokens: 400,
+      max_tokens: 300,
       messages: [{ role: 'user', content: prompt }],
       response_format: { type: 'json_object' },
     });
@@ -243,105 +239,119 @@ async function rewriteQuestion(q) {
     if (result.question && !answerInQuestion(result.question, q.answer)) {
       return { ...q, question: result.question.trim() };
     }
-    return null; // rewrite still failed
+    return null;
   } catch (e) {
     return null;
   }
 }
 
+// Main batch generation — 3-step pipeline per category
 async function generateBatch(batchNum, focusCategories, usedTopics) {
-  const response = await client.chat.completions.create({
-    model: 'gpt-4o',
-    max_tokens: 3000,
-    messages: [
-      { role: 'system', content: SYSTEM_PROMPT },
-      { role: 'user',   content: buildPrompt(batchNum, focusCategories, usedTopics) },
-    ],
-    response_format: { type: 'json_object' },
-  });
+  const allQuestions = [];
+  const categoriesToProcess = focusCategories || CATEGORIES;
+  const pieCategory = CATEGORIES[batchNum % CATEGORIES.length];
 
-  const text = response.choices[0].message.content || '';
-  const obj  = JSON.parse(text);
-  let parsed;
-  if (Array.isArray(obj)) {
-    parsed = obj;
-  } else {
-    const arrays = Object.values(obj).filter(v => Array.isArray(v));
-    parsed = arrays.length > 0 ? arrays[0] : [];
-  }
+  for (const category of categoriesToProcess) {
+    try {
+      const questionsPerCat = focusCategories ? 3 : (DISTRIBUTION[category]?.regular || 8);
+      const isPie = category === pieCategory && !focusCategories;
 
-  const mapped = parsed
-    .map(q => {
-      const cat = normalizeCategory(q.category);
-      if (!cat || !q.question || !q.answer) return null;
-      return {
-        category: cat,
-        question: String(q.question).trim(),
-        answer:   String(q.answer).trim(),
-        is_pie:   q.is_pie === true,
-        canadian: q.canadian === true,
-      };
-    });
+      console.log('     [' + category + '] Generating search queries...');
 
-  // Separate clean questions from ones that need rewriting
-  const clean = [];
-  const needsRewrite = [];
+      // Step 1: Generate search queries
+      const queries = await generateSearchQueries(category, usedTopics);
+      console.log('     [' + category + '] Queries: ' + queries.slice(0, 2).join(' | ') + '...');
 
-  for (const q of mapped) {
-    if (!q) continue;
-    if (answerInQuestion(q.question, q.answer)) {
-      console.log('   Rewriting (answer in question): "' + q.answer + '"');
-      needsRewrite.push(q);
-    } else {
-      clean.push(q);
-    }
-  }
-
-  // Attempt rewrites in parallel
-  if (needsRewrite.length > 0) {
-    const rewritten = await Promise.all(needsRewrite.map(q => rewriteQuestion(q)));
-    rewritten.forEach((q, i) => {
-      if (q) {
-        console.log('   Rewrite succeeded: "' + q.answer + '"');
-        clean.push(q);
-      } else {
-        console.log('   Rewrite failed, discarding: "' + needsRewrite[i].answer + '"');
+      // Step 2: Search web with 2 of the queries (balance speed vs diversity)
+      const searchResults = [];
+      for (const query of queries.slice(0, 2)) {
+        const result = await searchWeb(query);
+        if (result) searchResults.push(result);
+        await new Promise(r => setTimeout(r, 500));
       }
-    });
+
+      if (searchResults.length === 0) {
+        console.log('     [' + category + '] No search results, skipping');
+        continue;
+      }
+
+      const combinedContent = searchResults.join('\n\n---\n\n');
+
+      // Step 3: Generate questions from content
+      console.log('     [' + category + '] Writing questions from search results...');
+      const raw = await generateQuestionsFromContent(
+        category, combinedContent, questionsPerCat, isPie, usedTopics
+      );
+
+      // Validate and clean
+      const clean = [];
+      const needsRewrite = [];
+
+      for (const q of raw) {
+        const cat = normalizeCategory(q.category || category);
+        if (!cat || !q.question || !q.answer) continue;
+        const mapped = {
+          category: cat,
+          question: String(q.question).trim(),
+          answer: String(q.answer).trim(),
+          is_pie: q.is_pie === true,
+          canadian: q.canadian === true,
+        };
+        if (answerInQuestion(mapped.question, mapped.answer)) {
+          needsRewrite.push(mapped);
+        } else {
+          clean.push(mapped);
+        }
+      }
+
+      // Attempt rewrites
+      if (needsRewrite.length > 0) {
+        const rewritten = await Promise.all(needsRewrite.map(q => rewriteQuestion(q)));
+        rewritten.forEach(q => { if (q) clean.push(q); });
+      }
+
+      console.log('     [' + category + '] ' + clean.length + ' questions ready');
+      allQuestions.push(...clean);
+
+    } catch (err) {
+      console.error('     [' + category + '] Error: ' + err.message);
+    }
+
+    // Small delay between categories
+    await new Promise(r => setTimeout(r, 600));
   }
 
-  return clean;
+  return allQuestions;
 }
 
 async function refillBank(focusCategories) {
   if (isRefilling) { console.log('Refill already in progress'); return; }
   isRefilling = true;
   const before = await getUnusedCount();
-  const target = focusCategories ? 100 : REFILL_AMOUNT;
-  // Smaller batches of ~10 questions each — more batches but far more diverse
-  const batchesNeeded = Math.ceil(target / 10);
-  console.log('Starting refill — bank: ' + before + ', target: +' + target + ' (' + batchesNeeded + ' small batches of ~10)');
+  const target = focusCategories ? 60 : REFILL_AMOUNT;
+  // Each batch covers all 6 categories = ~54 questions
+  // So batches needed = target / 54
+  const batchesNeeded = Math.max(1, Math.ceil(target / 54));
+  console.log('Starting web-search refill — bank: ' + before + ', target: +' + target + ' (' + batchesNeeded + ' batches)');
 
   let totalAdded = 0;
-  const usedTopics = []; // tracks topics used across all batches this session
+  const usedTopics = [];
 
   try {
     for (let i = 1; i <= batchesNeeded; i++) {
-      console.log('   Generating batch ' + i + '/' + batchesNeeded + ' (avoiding ' + usedTopics.length + ' used topics)...');
+      console.log('   === Batch ' + i + '/' + batchesNeeded + ' (topic memory: ' + usedTopics.length + ' items) ===');
       const questions = await generateBatch(i, focusCategories, usedTopics);
-      const inserted  = await insertQuestions(questions);
+      const inserted = await insertQuestions(questions);
       const count = parseInt(inserted) || 0;
       totalAdded += count;
 
-      // Add this batch's topics to memory so next batch avoids them
-      questions.forEach(q => {
-        // Extract key topic words from the answer as the "topic"
-        if (q.answer) usedTopics.push(q.answer);
-      });
+      // Add answers to topic memory to prevent future repetition
+      questions.forEach(q => { if (q.answer) usedTopics.push(q.answer); });
 
-      console.log('   Batch ' + i + ': ' + count + ' inserted, ' + usedTopics.length + ' topics now in memory');
-      if (i < batchesNeeded) await new Promise(r => setTimeout(r, 800));
+      console.log('   Batch ' + i + ' complete: ' + count + ' inserted, ' + totalAdded + ' total so far');
+      if (i < batchesNeeded) await new Promise(r => setTimeout(r, 1500));
     }
+
     await logRefill(before, totalAdded, 'success');
     const after = await getUnusedCount();
     console.log('Refill complete — bank now has ' + after + ' (+' + totalAdded + ')');
