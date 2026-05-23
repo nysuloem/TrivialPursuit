@@ -187,41 +187,24 @@ function stopTTS() {
 
 function stopSpeaking() { stopTTS(); }
 
-// 🏀 Team switch — loud satisfying spank/swish
+// ✗ Wrong answer / team switch — 4 descending tones
 function playSwish(ctx) {
   if (!ctx) return;
   const t = ctx.currentTime;
-  // Longer, louder noise burst
-  const buf = ctx.createBuffer(1, ctx.sampleRate * 0.6, ctx.sampleRate);
-  const data = buf.getChannelData(0);
-  for (let i = 0; i < data.length; i++) data[i] = (Math.random() * 2 - 1);
-  const src  = ctx.createBufferSource();
-  const filt = ctx.createBiquadFilter();
-  const gain = ctx.createGain();
-  src.buffer = buf;
-  filt.type  = 'bandpass';
-  filt.frequency.setValueAtTime(400, t);
-  filt.frequency.linearRampToValueAtTime(4000, t + 0.12);
-  filt.frequency.linearRampToValueAtTime(800, t + 0.4);
-  filt.Q.value = 0.6;
-  src.connect(filt); filt.connect(gain); gain.connect(ctx.destination);
-  // Sharp attack, slow decay — classic spank shape
-  gain.gain.setValueAtTime(0.001, t);
-  gain.gain.linearRampToValueAtTime(0.9, t + 0.015);  // loud sharp hit
-  gain.gain.exponentialRampToValueAtTime(0.3, t + 0.12);
-  gain.gain.exponentialRampToValueAtTime(0.001, t + 0.55);
-  src.start(t); src.stop(t + 0.6);
-
-  // Add a low thump underneath for extra impact
-  const osc  = ctx.createOscillator();
-  const ogain = ctx.createGain();
-  osc.connect(ogain); ogain.connect(ctx.destination);
-  osc.type = 'sine';
-  osc.frequency.setValueAtTime(120, t);
-  osc.frequency.exponentialRampToValueAtTime(40, t + 0.3);
-  ogain.gain.setValueAtTime(0.5, t);
-  ogain.gain.exponentialRampToValueAtTime(0.001, t + 0.35);
-  osc.start(t); osc.stop(t + 0.35);
+  const freqs = [349, 294, 247, 196]; // descending: F4 → D4 → B3 → G3
+  freqs.forEach((freq, i) => {
+    const osc  = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(freq, t + i * 0.13);
+    osc.frequency.exponentialRampToValueAtTime(freq * 0.85, t + i * 0.13 + 0.12);
+    gain.gain.setValueAtTime(0.0, t + i * 0.13);
+    gain.gain.linearRampToValueAtTime(0.16, t + i * 0.13 + 0.02);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + i * 0.13 + 0.14);
+    osc.connect(gain); gain.connect(ctx.destination);
+    osc.start(t + i * 0.13);
+    osc.stop(t + i * 0.13 + 0.15);
+  });
 }
 
 // ─── CONSTANTS ─────────────────────────────────────────────────────────────
