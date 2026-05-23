@@ -21,11 +21,11 @@ const DISTRIBUTION = {
 // Category-specific guidance for search query generation
 const CATEGORY_SEARCH_GUIDANCE = {
   'Geography': 'surprising geography facts, unusual borders, places that changed names, extreme geography records, bizarre territorial anomalies, unexpected climate facts, islands nobody knows about',
-  'TV, Movies & Music': 'recent streaming shows 2024, new music releases 2024, viral TV moments, surprising music records, behind the scenes film facts, unexpected casting decisions, recent award show moments',
+  'TV, Movies & Music': 'latest streaming shows, new music releases recent, viral TV moments, surprising music records, behind the scenes film facts, unexpected casting decisions, recent award show moments',
   'History': 'bizarre historical facts that sound made up, unexpected causes of famous events, strange historical coincidences, surprising firsts in history, weird historical laws, obscure events that changed the world',
-  'Science & Nature': 'surprising scientific discoveries 2024, weird animal behaviors, unexpected physics facts, strange chemistry facts, recent space discoveries, bizarre medical facts, record-breaking natural phenomena',
-  'Sports & Games': 'surprising sports records 2024, obscure Olympic facts, unexpected video game records, strange board game history, unusual sports moments, recent esports milestones, weird sports rules',
-  'Pop Culture & Current Events': 'viral pop culture moments teenagers 2024, biggest North American news stories 2024, recent celebrity drama US Canada, trending Gen Z internet culture 2024, major world events affecting North Americans 2024, surprising political news Canada United States 2024, viral social media moments mainstream news 2024',
+  'Science & Nature': 'surprising scientific discoveries recent, weird animal behaviors, unexpected physics facts, strange chemistry facts, recent space discoveries, bizarre medical facts, record-breaking natural phenomena',
+  'Sports & Games': 'surprising sports records recent, obscure Olympic facts, unexpected video game records, strange board game history, unusual sports moments, recent esports milestones, weird sports rules',
+  'Pop Culture & Current Events': 'viral pop culture moments teenagers recent, biggest North American news stories recent, recent celebrity drama US Canada, trending Gen Z internet culture, major world events affecting North Americans, surprising political news Canada United States, viral social media moments mainstream news',
 };
 
 const QUESTION_SYSTEM_PROMPT = [
@@ -104,13 +104,13 @@ async function generateSearchQueries(category, usedTopics) {
     // Fallback — generate default queries for this category
     console.log('     Query generation returned unexpected format, using defaults');
     return [
-      'surprising little-known facts ' + category + ' 2024',
+      'surprising little-known facts ' + category + ' recent',
       'unusual ' + category.toLowerCase() + ' records and firsts',
     ];
   } catch (e) {
     console.log('     Query generation failed: ' + e.message + ' — using defaults');
     return [
-      'surprising little-known facts ' + category + ' 2024',
+      'surprising little-known facts ' + category + ' recent',
       'unusual ' + category.toLowerCase() + ' records and firsts',
     ];
   }
@@ -203,7 +203,7 @@ async function generateQuestionsFromContent(category, content, count, isPieCateg
     category === 'TV, Movies & Music'
       ? 'Lean toward 2020-2025 content but include 2-3 classic era questions (70s/80s/90s) so parents can shine too.'
       : category === 'Pop Culture & Current Events'
-      ? 'Mix teen-friendly viral/celebrity content (60%) with genuine current events and news stories (40%) that a North American family would have heard about. Include politics, world events, sports moments that made headlines, and cultural moments from 2022-2024. Make news questions accessible — focus on the surprising or ironic angle rather than dry facts.'
+      ? 'Mix teen-friendly viral/celebrity content (60%) with genuine current events and news stories (40%) that a North American family would have heard about. Include politics, world events, sports moments that made headlines, and cultural moments from recent years. Make news questions accessible — focus on the surprising or ironic angle rather than dry facts.'
       : 'Mix across different eras, cultures, and sub-topics for broad appeal.',
     '',
     'Mark canadian:true only if specifically about Canada.',
@@ -292,7 +292,7 @@ async function generateBatch(batchNum, focusCategories, usedTopics) {
 
   for (const category of categoriesToProcess) {
     try {
-      const questionsPerCat = focusCategories ? 3 : (DISTRIBUTION[category]?.regular || 8);
+      const questionsPerCat = focusCategories ? 8 : (DISTRIBUTION[category]?.regular || 8);
       const isPie = category === pieCategory && !focusCategories;
 
       console.log('     [' + category + '] Generating search queries...');
@@ -367,10 +367,11 @@ async function refillBank(focusCategories) {
   if (isRefilling) { console.log('Refill already in progress'); return; }
   isRefilling = true;
   const before = await getUnusedCount();
-  const target = focusCategories ? 60 : REFILL_AMOUNT;
-  // Each batch covers all 6 categories = ~54 questions
-  // So batches needed = target / 54
-  const batchesNeeded = Math.max(1, Math.ceil(target / 54));
+  const target = focusCategories ? 100 : REFILL_AMOUNT;
+  // For focused refills: each batch generates ~8 questions per category
+  // For full refills: each batch covers all 6 categories = ~54 questions
+  const questionsPerBatch = focusCategories ? (8 * focusCategories.length) : 54;
+  const batchesNeeded = Math.max(3, Math.ceil(target / questionsPerBatch));
   console.log('Starting web-search refill — bank: ' + before + ', target: +' + target + ' (' + batchesNeeded + ' batches)');
 
   let totalAdded = 0;
