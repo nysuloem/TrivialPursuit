@@ -21,7 +21,11 @@ const DISTRIBUTION = {
 // Category-specific guidance for search query generation
 const CATEGORY_SEARCH_GUIDANCE = {
   'Geography': 'surprising geography facts, unusual borders, places that changed names, extreme geography records, bizarre territorial anomalies, unexpected climate facts, islands nobody knows about',
-  'TV, Movies & Music': 'latest streaming shows, new music releases recent, viral TV moments, surprising music records, behind the scenes film facts, unexpected casting decisions, recent award show moments',
+  'TV, Movies & Music': [
+    'TV SHOWS: recent streaming hits Netflix HBO Disney Plus, classic TV shows 1980s 1990s 2000s, actors characters catchphrases plot twists spinoffs',
+    'MOVIES: blockbuster films 1980s to present, actors directors franchises, surprising film facts box office records, recent releases',
+    'MUSIC: pop rock hip hop country artists 1980s to present, albums records chart moments, surprising music industry facts, recent artists',
+  ].join(' | '),
   'History': 'bizarre historical facts that sound made up, unexpected causes of famous events, strange historical coincidences, surprising firsts in history, weird historical laws, obscure events that changed the world',
   'Science & Nature': 'surprising scientific discoveries recent, weird animal behaviors, unexpected physics facts, strange chemistry facts, recent space discoveries, bizarre medical facts, record-breaking natural phenomena',
   'Sports & Games': 'ROTATE between these three types equally: (1) SPORTS: NHL NBA NFL MLB PGA golf records championships stars moments 1980s to present, (2) VIDEO GAMES: Nintendo PlayStation Xbox Steam gaming history console wars popular franchises Minecraft Fortnite Mario Pokemon GTA Zelda esports, (3) BOARD GAMES: Monopoly chess poker Magic The Gathering Dungeons Dragons Scrabble card games trivia',
@@ -53,7 +57,7 @@ const QUESTION_SYSTEM_PROMPT = [
   '- BAD: "Although he played a meth-cooking teacher, Bryan Cranston is best known for which TV series?" (that IS Breaking Bad)',
   '- GOOD: "Bryan Cranston spent years as the bumbling dad on Malcolm in the Middle — which later AMC role won him four Emmy Awards?"',
   '',
-  'NO AS-OF PHRASING: Never write "as of 2024", "currently", "at the time". State years naturally in context.',
+  'NO AS-OF PHRASING: Never write "as of 2024", "currently", "at the time". State years naturally in context when relevant.',
   '',
   '=== GEOGRAPHIC & CULTURAL RELEVANCE ===',
   '- 70% of questions should cover North American culture, history, sports, and entertainment (US and Canada)',
@@ -204,7 +208,15 @@ async function generateQuestionsFromContent(category, content, count, isPieCateg
     '',
     '=== GENERATIONAL MIX for ' + category + ' ===',
     category === 'TV, Movies & Music'
-      ? 'Lean toward 2020-2025 content but include 2-3 classic era questions (70s/80s/90s) so parents can shine too.'
+      ? [
+          'Split questions roughly: 40% TV shows, 30% movies, 30% music. ALL content from 1980s to present only.',
+          'TV: streaming platforms (Netflix, HBO, Disney+, Apple TV+), classic network TV, actors, characters, catchphrases, plot twists, spinoffs, awards. Recent hits: The Bear, Succession, Wednesday, Euphoria, Stranger Things, White Lotus, House of the Dragon, The Last of Us, Severance, Abbott Elementary. Classic: Friends, Seinfeld, The Office, Breaking Bad, Sopranos, Game of Thrones, Lost, Grey\'s Anatomy.',
+          'MOVIES: blockbusters, franchises (Marvel, Star Wars, Fast & Furious, Harry Potter, Lord of the Rings), directors, actors, box office records, behind the scenes facts, recent releases (Barbie, Oppenheimer, Top Gun Maverick, Everything Everywhere).',
+          'MUSIC: pop, rock, hip hop, country, R&B from 1980s to present. Artists, albums, chart records, award moments, collaborations. Recent: Taylor Swift, Olivia Rodrigo, Billie Eilish, Kendrick Lamar, Bad Bunny, The Weeknd. Classic: Michael Jackson, Madonna, Prince, Nirvana, Eminem, Beyonce.',
+          'YEAR DIVERSITY IS CRITICAL: Do NOT cluster questions around the same 1-2 years. Spread across the full range 1980s to present. If you write a question about something from 2023, the next question should be from a different era — maybe the 90s, or 2015, or 2008. Aim for no more than 2 questions from the same decade per batch.',
+          'AT LEAST 75% of questions must be from 2000 to present — lean toward recent content teens would know.',
+          'Vary question types: actor trivia, show facts, music records, platform firsts, character names, film budgets, chart positions.',
+        ].join(' ')
       : category === 'Sports & Games'
       ? [
           'Split questions roughly: 35% video games, 35% North American sports, 30% board/card/other games.',
@@ -306,7 +318,7 @@ async function generateBatch(batchNum, focusCategories, usedTopics) {
       const questionsPerCat = focusCategories ? 8 : (DISTRIBUTION[category]?.regular || 8);
       const isPie = category === pieCategory && !focusCategories;
 
-    // For Sports & Games, force separate searches for each sub-type
+    // For Sports & Games and TV Movies Music, force separate searches for each sub-type
     let searchResults = [];
     if (category === 'Sports & Games') {
       console.log('     [' + category + '] Running 3 sub-type searches (sports / video games / board games)...');
@@ -314,6 +326,22 @@ async function generateBatch(batchNum, focusCategories, usedTopics) {
         await generateSearchQueries('Sports & Games - SPORTS ONLY: NHL NBA NFL MLB PGA golf records stars moments', usedTopics),
         await generateSearchQueries('Sports & Games - VIDEO GAMES ONLY: Nintendo PlayStation Xbox Steam Minecraft Fortnite Mario Pokemon GTA console history', usedTopics),
         await generateSearchQueries('Sports & Games - BOARD AND CARD GAMES ONLY: Monopoly chess poker Magic Gathering Dungeons Dragons Scrabble Wordle', usedTopics),
+      ];
+      for (const queries of subTypeQueries) {
+        if (queries.length > 0) {
+          const result = await searchWeb(queries[0]);
+          if (result) searchResults.push(result);
+          await new Promise(r => setTimeout(r, 500));
+        }
+      }
+    } else if (category === 'TV, Movies & Music') {
+      console.log('     [' + category + '] Running 3 sub-type searches (TV / movies / music) across eras...');
+      // Rotate era focus across batches so we get good year diversity
+      const eraFocus = ['recent 2020s', '2000s 2010s', '1980s 1990s'][batchNum % 3];
+      const subTypeQueries = [
+        await generateSearchQueries('TV SHOWS ' + eraFocus + ': streaming platforms Netflix HBO Disney Plus, network TV, actors characters catchphrases plot twists spinoffs awards', usedTopics),
+        await generateSearchQueries('MOVIES ' + eraFocus + ': blockbusters franchises actors directors box office records behind the scenes facts', usedTopics),
+        await generateSearchQueries('MUSIC ' + eraFocus + ': pop rock hip hop country R&B artists albums chart records award moments collaborations', usedTopics),
       ];
       for (const queries of subTypeQueries) {
         if (queries.length > 0) {
