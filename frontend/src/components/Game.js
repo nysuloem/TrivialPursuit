@@ -232,6 +232,7 @@ const TEAMS = [
 ];
 
 const S = {
+  INTRO:            'intro',          // opening splash screen
   DICE_ROLL:        'dice_roll',     // who goes first screen
   CHOOSING:         'choosing',
   CAT_SPLASH:       'cat_splash',
@@ -245,7 +246,128 @@ const S = {
   WINNER:           'winner',
 };
 
-// ─── PIE INTRO ANIMATION ───────────────────────────────────────────────────
+// Short display names for categories that are too long for small UI
+const CAT_SHORT = {
+  'Geography':                   'Geography',
+  'TV, Movies & Music':          'TV & Music',
+  'History':                     'History',
+  'Science & Nature':            'Science',
+  'Sports & Games':              'Sports',
+  'Pop Culture & Current Events':'Pop Culture',
+};
+
+// ─── OPENING SCENE ────────────────────────────────────────────────────────
+function IntroScene({ onDone }) {
+  const [phase, setPhase] = useState('title');
+  const [visibleCats, setVisibleCats] = useState([]);
+  const [showPlay, setShowPlay] = useState(false);
+
+  useEffect(() => {
+    const t1 = setTimeout(() => setPhase('categories'), 1800);
+    return () => clearTimeout(t1);
+  }, []);
+
+  useEffect(() => {
+    if (phase !== 'categories') return;
+    CATEGORIES.forEach((_, i) => {
+      setTimeout(() => setVisibleCats(prev => [...prev, i]), i * 250);
+    });
+    setTimeout(() => setShowPlay(true), CATEGORIES.length * 250 + 600);
+  }, [phase]);
+
+  return (
+    <div style={{
+      minHeight:'100vh', background:'#0a0a0a',
+      display:'flex', flexDirection:'column',
+      alignItems:'center', justifyContent:'center',
+      padding:24, gap:28, overflow:'hidden',
+    }}>
+      <style>{`
+        @keyframes titleDrop  { 0%{transform:translateY(-60px);opacity:0} 70%{transform:translateY(6px)} 100%{transform:translateY(0);opacity:1} }
+        @keyframes namePop    { 0%{transform:scale(0.5);opacity:0} 70%{transform:scale(1.1)} 100%{transform:scale(1);opacity:1} }
+        @keyframes catFall    { 0%{transform:translateY(-80px) rotate(-8deg);opacity:0} 60%{transform:translateY(6px) rotate(2deg)} 100%{transform:translateY(0) rotate(0deg);opacity:1} }
+        @keyframes pieSpin    { 0%{transform:rotate(-180deg) scale(0);opacity:0} 70%{transform:rotate(10deg) scale(1.1)} 100%{transform:rotate(0deg) scale(1);opacity:1} }
+        @keyframes playPulse  { 0%,100%{transform:scale(1);box-shadow:0 0 20px #fbbf2444} 50%{transform:scale(1.04);box-shadow:0 0 40px #fbbf2488} }
+        @keyframes subFade    { 0%{opacity:0} 100%{opacity:1} }
+        @keyframes vsGlow     { 0%,100%{opacity:0.3} 50%{opacity:0.8} }
+      `}</style>
+
+      {/* Main title */}
+      <div style={{ textAlign:'center', animation:'titleDrop 0.7s cubic-bezier(0.34,1.56,0.64,1) forwards' }}>
+        <div style={{ fontSize:'clamp(36px,8vw,64px)', fontWeight:900, color:'#fff', letterSpacing:-2, lineHeight:1 }}>
+          TRIVIAL PURSUIT
+        </div>
+      </div>
+
+      {/* Family names */}
+      <div style={{
+        display:'flex', alignItems:'center', gap:12,
+        animation:'subFade 0.6s 0.4s ease both',
+      }}>
+        {['Brown', 'Rutter', 'Flower'].map((name, i) => (
+          <React.Fragment key={name}>
+            {i > 0 && (
+              <div style={{
+                fontSize:12, color:'#333', fontFamily:'monospace',
+                animation:'vsGlow 2s ease infinite',
+              }}>✦</div>
+            )}
+            <div style={{
+              fontSize:'clamp(16px,3vw,22px)', fontWeight:700,
+              color: ['#3b82f6','#ef4444','#22c55e'][i],
+              fontFamily:'Georgia,serif', letterSpacing:1,
+              animation:`namePop 0.5s ${0.5 + i * 0.15}s cubic-bezier(0.34,1.56,0.64,1) both`,
+              textShadow:`0 0 20px ${ ['#3b82f644','#ef444444','#22c55e44'][i]}`,
+            }}>
+              {name}
+            </div>
+          </React.Fragment>
+        ))}
+      </div>
+
+      {/* Category tiles */}
+      {phase === 'categories' && (
+        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:10, maxWidth:480, width:'100%' }}>
+          {CATEGORIES.map((cat, i) => (
+            <div key={cat} style={{
+              opacity: visibleCats.includes(i) ? 1 : 0,
+              animation: visibleCats.includes(i) ? 'catFall 0.5s cubic-bezier(0.34,1.56,0.64,1) forwards' : 'none',
+              background:`${CAT_COLORS[cat]}18`,
+              border:`2px solid ${CAT_COLORS[cat]}55`,
+              borderRadius:12, padding:'14px 8px',
+              textAlign:'center', display:'flex',
+              flexDirection:'column', alignItems:'center', gap:6,
+            }}>
+              <div style={{
+                fontSize:28,
+                animation: visibleCats.includes(i) ? 'pieSpin 0.6s 0.1s cubic-bezier(0.34,1.56,0.64,1) both' : 'none',
+                filter:`drop-shadow(0 0 8px ${CAT_COLORS[cat]})`,
+              }}>
+                {CAT_EMOJI[cat]}
+              </div>
+              <div style={{ fontSize:10, color:CAT_COLORS[cat], fontFamily:'monospace', fontWeight:700, letterSpacing:0.5 }}>
+                {CAT_SHORT[cat]}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Play button */}
+      {showPlay && (
+        <button onClick={onDone} style={{
+          padding:'16px 56px', borderRadius:12, cursor:'pointer',
+          fontSize:18, fontFamily:'monospace', letterSpacing:4, fontWeight:900,
+          border:'2px solid #fbbf24', background:'#fbbf2415', color:'#fbbf24',
+          animation:'playPulse 1.5s ease infinite',
+        }}>
+          ▶ PLAY NOW
+        </button>
+      )}
+    </div>
+  );
+}
+
 function PieIntro({ category, teamIdx, onDone }) {
   const [step, setStep] = useState(0);
   useEffect(() => {
@@ -795,7 +917,7 @@ export default function Game() {
     return audioCtxRef.current;
   };
 
-  const [state,      setState]      = useState(S.DICE_ROLL);
+  const [state,      setState]      = useState(S.INTRO);
   const [active,     setActive]     = useState(0); // will be set by dice roll
   const [scores,     setScores]     = useState([0, 0]);
   const [wedges,     setWedges]     = useState([[], []]);
@@ -1182,6 +1304,11 @@ export default function Game() {
     finally { setLoading(false); }
   };
 
+  // ── INTRO ─────────────────────────────────────────────────────────────────
+  if (state === S.INTRO) {
+    return <IntroScene onDone={() => setState(S.DICE_ROLL)} />;
+  }
+
   // ── DICE ROLL — who goes first ────────────────────────────────────────────
   if (state === S.DICE_ROLL) {
     return <DiceRoll onDone={handleDiceRollDone} />;
@@ -1392,7 +1519,7 @@ export default function Game() {
                   alignItems:'center', gap:8, opacity: alreadyUsed ? 0.4 : 1,
                 }}>
                   <span style={{ fontSize:32 }}>{CAT_EMOJI[cat]}</span>
-                  <div style={{ fontSize:12, fontWeight:700, color: alreadyUsed ? '#333' : CAT_COLORS[cat], lineHeight:1.3 }}>{cat}</div>
+                  <div style={{ fontSize:12, fontWeight:700, color: alreadyUsed ? '#333' : CAT_COLORS[cat], lineHeight:1.3 }}>{CAT_SHORT[cat]}</div>
                   {alreadyUsed && <div style={{ fontSize:9, color:'#444', fontFamily:'monospace' }}>used</div>}
                 </button>
               );
@@ -1449,7 +1576,7 @@ export default function Game() {
                 }}>
                   <span style={{ fontSize:36 }}>{CAT_EMOJI[cat]}</span>
                   <div style={{ flex:1 }}>
-                    <div style={{ fontSize:20, fontWeight:700, color: pieReady ? '#fbbf24' : CAT_COLORS[cat] }}>{cat}</div>
+                    <div style={{ fontSize:20, fontWeight:700, color: pieReady ? '#fbbf24' : CAT_COLORS[cat] }}>{CAT_SHORT[cat]}</div>
                     <div style={{ fontSize:13, color:'#555', fontFamily:'monospace', marginTop:4 }}>
                       {alreadyOwned ? '✓ wedge owned'
                         : pieReady ? '🥧 PIE QUESTION READY!'
