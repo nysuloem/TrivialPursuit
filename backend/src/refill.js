@@ -24,7 +24,7 @@ const CATEGORY_SEARCH_GUIDANCE = {
   'TV, Movies & Music': 'latest streaming shows, new music releases recent, viral TV moments, surprising music records, behind the scenes film facts, unexpected casting decisions, recent award show moments',
   'History': 'bizarre historical facts that sound made up, unexpected causes of famous events, strange historical coincidences, surprising firsts in history, weird historical laws, obscure events that changed the world',
   'Science & Nature': 'surprising scientific discoveries recent, weird animal behaviors, unexpected physics facts, strange chemistry facts, recent space discoveries, bizarre medical facts, record-breaking natural phenomena',
-  'Sports & Games': 'NHL hockey records stars moments, NBA basketball stars records moments, NFL football records stars moments, MLB baseball records stars moments, PGA golf major moments stars, North American sports records 1980s to present, surprising sports facts North America, video game console history facts, Steam PC gaming facts, popular video game franchises facts, esports moments records, board game card game trivia facts',
+  'Sports & Games': 'ROTATE between these three types equally: (1) SPORTS: NHL NBA NFL MLB PGA golf records championships stars moments 1980s to present, (2) VIDEO GAMES: Nintendo PlayStation Xbox Steam gaming history console wars popular franchises Minecraft Fortnite Mario Pokemon GTA Zelda esports, (3) BOARD GAMES: Monopoly chess poker Magic The Gathering Dungeons Dragons Scrabble card games trivia',
   'Pop Culture & Current Events': 'viral pop culture moments teenagers recent, biggest North American news stories recent, recent celebrity drama US Canada, trending Gen Z internet culture, major world events affecting North Americans, surprising political news Canada United States, viral social media moments mainstream news',
 };
 
@@ -306,19 +306,32 @@ async function generateBatch(batchNum, focusCategories, usedTopics) {
       const questionsPerCat = focusCategories ? 8 : (DISTRIBUTION[category]?.regular || 8);
       const isPie = category === pieCategory && !focusCategories;
 
-      console.log('     [' + category + '] Generating search queries...');
-
-      // Step 1: Generate search queries
+    // For Sports & Games, force separate searches for each sub-type
+    let searchResults = [];
+    if (category === 'Sports & Games') {
+      console.log('     [' + category + '] Running 3 sub-type searches (sports / video games / board games)...');
+      const subTypeQueries = [
+        await generateSearchQueries('Sports & Games - SPORTS ONLY: NHL NBA NFL MLB PGA golf records stars moments', usedTopics),
+        await generateSearchQueries('Sports & Games - VIDEO GAMES ONLY: Nintendo PlayStation Xbox Steam Minecraft Fortnite Mario Pokemon GTA console history', usedTopics),
+        await generateSearchQueries('Sports & Games - BOARD AND CARD GAMES ONLY: Monopoly chess poker Magic Gathering Dungeons Dragons Scrabble Wordle', usedTopics),
+      ];
+      for (const queries of subTypeQueries) {
+        if (queries.length > 0) {
+          const result = await searchWeb(queries[0]);
+          if (result) searchResults.push(result);
+          await new Promise(r => setTimeout(r, 500));
+        }
+      }
+    } else {
+      // Standard search for other categories
       const queries = await generateSearchQueries(category, usedTopics);
       console.log('     [' + category + '] Queries: ' + queries.slice(0, 2).join(' | ') + '...');
-
-      // Step 2: Search web with 2 of the queries (balance speed vs diversity)
-      const searchResults = [];
       for (const query of queries.slice(0, 2)) {
         const result = await searchWeb(query);
         if (result) searchResults.push(result);
         await new Promise(r => setTimeout(r, 500));
       }
+    }
 
       if (searchResults.length === 0) {
         console.log('     [' + category + '] No search results, skipping');
