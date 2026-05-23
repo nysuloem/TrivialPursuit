@@ -11,7 +11,7 @@ const CATEGORIES = [
   'History',
   'Science & Nature',
   'Sports & Games',
-  'Pop Culture',
+  'Pop Culture & Current Events',
 ];
 
 // ── Schema ────────────────────────────────────────────────────────────────────
