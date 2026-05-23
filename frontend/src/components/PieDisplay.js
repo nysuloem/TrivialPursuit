@@ -6,7 +6,7 @@ const CATEGORIES = [
   'History',
   'Science & Nature',
   'Sports & Games',
-  'Pop Culture',
+  'Pop Culture & Current Events',
 ];
 
 const CAT_COLORS = {
@@ -15,7 +15,7 @@ const CAT_COLORS = {
   'History':          '#b45309',
   'Science & Nature': '#d97706',
   'Sports & Games':   '#7c3aed',
-  'Pop Culture':      '#0891b2',
+  'Pop Culture & Current Events':      '#0891b2',
 };
 
 const CAT_EMOJI = {
@@ -24,7 +24,7 @@ const CAT_EMOJI = {
   'History':          '📜',
   'Science & Nature': '🔬',
   'Sports & Games':   '🎮',
-  'Pop Culture':      '🌟',
+  'Pop Culture & Current Events':      '🌟',
 };
 
 export { CATEGORIES, CAT_COLORS, CAT_EMOJI };
