@@ -149,6 +149,25 @@ router.get('/game/bank-count', async (req, res) => {
   }
 });
 
+// GET /api/game/category-counts — per-category unused question counts
+router.get('/game/category-counts', async (req, res) => {
+  try {
+    const result = await db.pool.query(`
+      SELECT category, COUNT(*) as count
+      FROM questions
+      WHERE used = FALSE
+      GROUP BY category
+      ORDER BY category
+    `);
+    const counts = {};
+    result.rows.forEach(r => { counts[r.category] = parseInt(r.count); });
+    const total = Object.values(counts).reduce((a, b) => a + b, 0);
+    res.json({ counts, total });
+  } catch (err) {
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 // ── Admin API (all protected) ─────────────────────────────────────────────────
 
 // GET /api/admin/stats
