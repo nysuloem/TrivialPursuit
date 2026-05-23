@@ -15,7 +15,7 @@ const DISTRIBUTION = {
   'History':            { regular: 8,  pie: 1 },
   'Science & Nature':   { regular: 8,  pie: 1 },
   'Sports & Games':     { regular: 10, pie: 1 },
-  'Pop Culture':        { regular: 10, pie: 1 },
+  'Pop Culture & Current Events':        { regular: 10, pie: 1 },
 };
 
 // Category-specific guidance for search query generation
@@ -25,7 +25,7 @@ const CATEGORY_SEARCH_GUIDANCE = {
   'History': 'bizarre historical facts that sound made up, unexpected causes of famous events, strange historical coincidences, surprising firsts in history, weird historical laws, obscure events that changed the world',
   'Science & Nature': 'surprising scientific discoveries 2024, weird animal behaviors, unexpected physics facts, strange chemistry facts, recent space discoveries, bizarre medical facts, record-breaking natural phenomena',
   'Sports & Games': 'surprising sports records 2024, obscure Olympic facts, unexpected video game records, strange board game history, unusual sports moments, recent esports milestones, weird sports rules',
-  'Pop Culture': 'viral moments teenagers 2024, surprising celebrity facts, unexpected internet trends 2024, behind the scenes streaming show facts, surprising music industry facts, Gen Z cultural moments 2024',
+  'Pop Culture & Current Events': 'viral pop culture moments teenagers 2024, biggest North American news stories 2024, recent celebrity drama US Canada, trending Gen Z internet culture 2024, major world events affecting North Americans 2024, surprising political news Canada United States 2024, viral social media moments mainstream news 2024',
 };
 
 const QUESTION_SYSTEM_PROMPT = [
@@ -202,8 +202,8 @@ async function generateQuestionsFromContent(category, content, count, isPieCateg
     '=== GENERATIONAL MIX for ' + category + ' ===',
     category === 'TV, Movies & Music'
       ? 'Lean toward 2020-2025 content but include 2-3 classic era questions (70s/80s/90s) so parents can shine too.'
-      : category === 'Pop Culture'
-      ? 'Lean heavily toward 2020-2025 teen-friendly content. Max 1-2 retro questions.'
+      : category === 'Pop Culture & Current Events'
+      ? 'Mix teen-friendly viral/celebrity content (60%) with genuine current events and news stories (40%) that a North American family would have heard about. Include politics, world events, sports moments that made headlines, and cultural moments from 2022-2024. Make news questions accessible — focus on the surprising or ironic angle rather than dry facts.'
       : 'Mix across different eras, cultures, and sub-topics for broad appeal.',
     '',
     'Mark canadian:true only if specifically about Canada.',
@@ -234,7 +234,7 @@ function normalizeCategory(cat) {
   if (CATEGORIES.includes(c)) return c;
   const lower = c.toLowerCase();
   if (lower.includes('tv') || lower.includes('movie') || lower.includes('music') || lower.includes('entertainment')) return 'TV, Movies & Music';
-  if (lower.includes('pop culture') || lower.includes('current event') || lower.includes('trend')) return 'Pop Culture';
+  if (lower.includes('pop culture') || lower.includes('current event') || lower.includes('trend')) return 'Pop Culture & Current Events';
   if (lower.includes('geograph')) return 'Geography';
   if (lower.includes('histor')) return 'History';
   if (lower.includes('science') || lower.includes('nature')) return 'Science & Nature';
