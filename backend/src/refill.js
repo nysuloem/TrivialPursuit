@@ -74,12 +74,15 @@ async function generateSearchQueries(category, usedTopics) {
     : '';
 
   const prompt = [
+    'Today\'s date is ' + new Date().toLocaleDateString('en-US', {year:'numeric', month:'long', day:'numeric'}) + '.',
     'Generate 4 specific, creative web search queries to find interesting trivia material for the "' + category + '" category of a family trivia game.',
     'The queries should find surprising, counterintuitive, or little-known facts that a North American family would find interesting.',
+    'Prioritize RECENT content — search for things that happened in the last 1-2 years where relevant.',
     'Bias toward US and Canadian content (70%) but include some globally relevant topics (30%) that North Americans would know.',
     'Category guidance: ' + CATEGORY_SEARCH_GUIDANCE[category],
     avoidList,
     'Make each query specific — not generic like "interesting facts about history".',
+    'Do NOT include specific years like 2023 or 2024 in your queries — use words like "recent", "latest", "this year" instead so the search finds the most current results.',
     'Respond ONLY with valid JSON: { "queries": ["query1", "query2", "query3", "query4"] }',
   ].join('\n');
 
