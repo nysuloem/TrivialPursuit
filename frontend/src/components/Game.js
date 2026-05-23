@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import PieDisplay, { CATEGORIES, CAT_COLORS, CAT_EMOJI } from './PieDisplay';
-import { getCategories, getAllCategories, getQuestion, markAnswered, getBankCount } from '../api';
+import { getCategories, getAllCategories, getCategoryCounts, getQuestion, markAnswered, getBankCount } from '../api';
 
 // ─── SOUND ENGINE (Web Audio API — no files needed) ────────────────────────
 function createAudioCtx() {
@@ -902,7 +902,8 @@ export default function Game() {
   const [chosenCat,  setChosenCat]  = useState(null);
   const [question,   setQuestion]   = useState(null);
   const [revealed,   setRevealed]   = useState(false);
-  const [bankCount,  setBankCount]  = useState(null);
+  const [bankCount,      setBankCount]      = useState(null);
+  const [categoryCounts, setCategoryCounts] = useState({});
   const [loading,    setLoading]    = useState(false);
   const [error,      setError]      = useState(null);
   const [flash,      setFlash]      = useState(null);
@@ -917,7 +918,13 @@ export default function Game() {
   useEffect(() => { activeTeamRef.current = active; }, [active]);
 
   useEffect(() => {
-    getBankCount().then(d => setBankCount(d.count)).catch(() => {});
+    const fetchCounts = () => {
+      getBankCount().then(d => setBankCount(d.count)).catch(() => {});
+      getCategoryCounts().then(d => setCategoryCounts(d.counts || {})).catch(() => {});
+    };
+    fetchCounts();
+    const interval = setInterval(fetchCounts, 30000); // refresh every 30s
+    return () => clearInterval(interval);
   }, []);
 
   const loadCategoryOptions = useCallback(async (activeTeam, currentWedges, checkFinal = true) => {
@@ -1688,12 +1695,32 @@ export default function Game() {
         </div>
       )}
 
-      {/* Rules */}
-      <div style={{ marginTop:12, maxWidth:540, width:'100%', padding:'8px 12px', borderRadius:7, background:'#0d0d0d', border:'1px solid #131313' }}>
-        <div style={{ fontSize:9, color:'#222', fontFamily:'monospace', textAlign:'center', lineHeight:1.9 }}>
-          PICK A CATEGORY · {STREAK_NEEDED} IN A ROW → PIE QUESTION · WIN PIE = WEDGE<br/>
-          WRONG ON PIE → OTHER TEAM CAN STEAL · STEAL CORRECT = WEDGE + BONUS TURN<br/>
-          COLLECT ALL {CATEGORIES.length} WEDGES TO WIN
+      {/* Question Bank */}
+      <div style={{ marginTop:12, maxWidth:540, width:'100%', padding:'10px 14px', borderRadius:7, background:'#0d0d0d', border:'1px solid #131313' }}>
+        <div style={{ fontSize:9, color:'#333', fontFamily:'monospace', textAlign:'center', marginBottom:6, letterSpacing:2 }}>
+          QUESTION BANK · {bankCount !== null ? bankCount : '—'} TOTAL{bankCount < 250 ? ' · REFILLING...' : ''}
+        </div>
+        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'3px 10px' }}>
+          {CATEGORIES.map(cat => {
+            const count = categoryCounts[cat] || 0;
+            const low = count < 50;
+            return (
+              <div key={cat} style={{ display:'flex', alignItems:'center', gap:5 }}>
+                <span style={{ fontSize:10 }}>{CAT_EMOJI[cat]}</span>
+                <div style={{ flex:1, height:3, background:'#1a1a1a', borderRadius:2, overflow:'hidden' }}>
+                  <div style={{
+                    height:'100%',
+                    width: `${Math.min((count / 200) * 100, 100)}%`,
+                    background: low ? '#ef4444' : CAT_COLORS[cat],
+                    borderRadius:2,
+                  }} />
+                </div>
+                <span style={{ fontSize:9, color: low ? '#ef4444' : '#2a2a2a', fontFamily:'monospace', minWidth:24, textAlign:'right' }}>
+                  {count}
+                </span>
+              </div>
+            );
+          })}
         </div>
       </div>
 
