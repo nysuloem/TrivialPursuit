@@ -24,7 +24,7 @@ const CATEGORY_SEARCH_GUIDANCE = {
   'TV, Movies & Music': 'latest streaming shows, new music releases recent, viral TV moments, surprising music records, behind the scenes film facts, unexpected casting decisions, recent award show moments',
   'History': 'bizarre historical facts that sound made up, unexpected causes of famous events, strange historical coincidences, surprising firsts in history, weird historical laws, obscure events that changed the world',
   'Science & Nature': 'surprising scientific discoveries recent, weird animal behaviors, unexpected physics facts, strange chemistry facts, recent space discoveries, bizarre medical facts, record-breaking natural phenomena',
-  'Sports & Games': 'surprising sports records recent, obscure Olympic facts, unexpected video game records, strange board game history, unusual sports moments, recent esports milestones, weird sports rules',
+  'Sports & Games': 'NHL hockey records stars moments, NBA basketball stars records moments, NFL football records stars moments, MLB baseball records stars moments, PGA golf major moments stars, North American sports records 1980s to present, surprising sports facts North America, video game console history facts, Steam PC gaming facts, popular video game franchises facts, esports moments records, board game card game trivia facts',
   'Pop Culture & Current Events': 'viral pop culture moments teenagers recent, biggest North American news stories recent, recent celebrity drama US Canada, trending Gen Z internet culture, major world events affecting North Americans, surprising political news Canada United States, viral social media moments mainstream news',
 };
 
@@ -205,6 +205,14 @@ async function generateQuestionsFromContent(category, content, count, isPieCateg
     '=== GENERATIONAL MIX for ' + category + ' ===',
     category === 'TV, Movies & Music'
       ? 'Lean toward 2020-2025 content but include 2-3 classic era questions (70s/80s/90s) so parents can shine too.'
+      : category === 'Sports & Games'
+      ? [
+          'Split questions roughly: 35% video games, 35% North American sports, 30% board/card/other games.',
+          'SPORTS: Focus on major North American leagues from 1980s to present — NHL, NBA, NFL, MLB, PGA golf. Ask about BOTH iconic players AND the sports themselves. Player questions: records, career moments, nicknames, championships. Sport questions: rules, team histories, iconic games, stadium facts, draft moments, trades, dynasties, coaching legends. Spread across many different players and teams — do not ask two questions about the same player or team. Examples of player variety: one NHL question about Gretzky, one NBA about Shaq, one NFL about Montana, one MLB about Jeter. Examples of sport variety: how many periods in hockey, what is a grand slam, what does MVP stand for, which city has won the most Super Bowls.',
+          'VIDEO GAMES: Cover a wide range — console history (NES, SNES, PlayStation, Xbox, Nintendo Switch), popular franchises (Mario, Zelda, Call of Duty, FIFA, Minecraft, Fortnite, GTA, Pokemon), Steam/PC gaming, esports, gaming milestones, iconic characters, game developers. NOT just world records — ask about gameplay, lore, platforms, release facts, cultural impact.',
+          'BOARD/CARD GAMES: Monopoly, Scrabble, chess, poker, Magic: The Gathering, Dungeons & Dragons, Wordle, game shows.',
+          'Keep teenage gamers engaged — at least 3-4 video game questions per batch covering both retro and modern titles.',
+        ].join(' ')
       : category === 'Pop Culture & Current Events'
       ? 'Mix teen-friendly viral/celebrity content (60%) with genuine current events and news stories (40%) that a North American family would have heard about. Include politics, world events, sports moments that made headlines, and cultural moments from recent years. Make news questions accessible — focus on the surprising or ironic angle rather than dry facts.'
       : 'Mix across different eras, cultures, and sub-topics for broad appeal.',
