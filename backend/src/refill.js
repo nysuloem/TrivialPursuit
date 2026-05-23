@@ -27,7 +27,10 @@ const CATEGORY_SEARCH_GUIDANCE = {
     'MUSIC: pop rock hip hop country artists 1980s to present, albums records chart moments, surprising music industry facts, recent artists',
   ].join(' | '),
   'History': 'bizarre historical facts that sound made up, unexpected causes of famous events, strange historical coincidences, surprising firsts in history, weird historical laws, obscure events that changed the world',
-  'Science & Nature': 'surprising scientific discoveries recent, weird animal behaviors, unexpected physics facts, strange chemistry facts, recent space discoveries, bizarre medical facts, record-breaking natural phenomena',
+  'Science & Nature': [
+    'SCIENCE: famous scientists discoveries breakthroughs inventions, science news recent, space exploration NASA discoveries, human body medicine health facts, physics chemistry biology surprising facts',
+    'NATURE: interesting animals facts behaviors records, plants trees fungi surprising facts, ocean sea life facts, weather climate natural phenomena, ecosystems environments surprising nature facts',
+  ].join(' | '),
   'Sports & Games': 'ROTATE between these three types equally: (1) SPORTS: NHL NBA NFL MLB PGA golf records championships stars moments 1980s to present, (2) VIDEO GAMES: Nintendo PlayStation Xbox Steam gaming history console wars popular franchises Minecraft Fortnite Mario Pokemon GTA Zelda esports, (3) BOARD GAMES: Monopoly chess poker Magic The Gathering Dungeons Dragons Scrabble card games trivia',
   'Pop Culture & Current Events': 'viral pop culture moments teenagers recent, biggest North American news stories recent, recent celebrity drama US Canada, trending Gen Z internet culture, major world events affecting North Americans, surprising political news Canada United States, viral social media moments mainstream news',
 };
@@ -217,9 +220,27 @@ async function generateQuestionsFromContent(category, content, count, isPieCateg
           'AT LEAST 75% of questions must be from 2000 to present — lean toward recent content teens would know.',
           'Vary question types: actor trivia, show facts, music records, platform firsts, character names, film budgets, chart positions.',
         ].join(' ')
+      : category === 'Science & Nature'
+      ? [
+          'Split roughly 50% science, 50% nature.',
+          'SCIENCE sub-topics to rotate across — never cluster the same type twice in a row:',
+          '- Famous scientists and discoveries: Einstein, Darwin, Curie, Newton, Hawking, Tesla, Pasteur — their breakthroughs, rivalries, surprising personal facts',
+          '- Space exploration: NASA milestones, planets, stars, black holes, Mars missions, moon landing facts, James Webb telescope discoveries',
+          '- Human body: bones, organs, senses, blood types, brain facts, sleep, DNA, surprising body facts ("the human eye can distinguish 10 million colours")',
+          '- Technology and inventions: who invented what, when was it invented, how everyday technology works (GPS, WiFi, microwave, internet, vaccines)',
+          '- Food science: why bread rises, what makes chili hot, why onions make you cry, fermentation, surprising food chemistry',
+          '- "Did you know" science facts: octopuses have 3 hearts, honey never spoils, bananas are radioactive, lightning is hotter than the sun — accessible and surprising',
+          'NATURE sub-topics to rotate across:',
+          '- Animal records and behaviors: fastest, largest, strangest, most venomous, unique adaptations — focus on well-known animals with surprising angles',
+          '- Ocean and marine life: sharks, whales, deep sea creatures, coral reefs, ocean records',
+          '- Plants and trees: world\'s oldest tree, carnivorous plants, how plants communicate, rainforest facts',
+          '- Weather and natural phenomena: tornadoes, lightning, Aurora Borealis, record temperatures, natural disasters',
+          '- Environmental science: endangered species, conservation wins, climate facts teens care about',
+          'GETTABILITY IS KEY: Every question must be answerable by someone with general knowledge. No obscure taxonomy, no specialist jargon. The surprising angle should be accessible.',
+          'Vary question types: records, comparisons, "what is the only...", inventor questions, body facts, space milestones, "did you know" style hooks.',
+        ].join(' ')
       : category === 'Sports & Games'
       ? [
-          'Split questions roughly: 35% video games, 35% North American sports, 30% board/card/other games.',
           'SPORTS: Focus on major North American leagues from 1980s to present — NHL, NBA, NFL, MLB, PGA golf. Ask about BOTH iconic players AND the sports themselves. Player questions: records, career moments, nicknames, championships. Sport questions: rules, team histories, iconic games, stadium facts, draft moments, trades, dynasties, coaching legends. Spread across many different players and teams — do not ask two questions about the same player or team. Examples of player variety: one NHL question about Gretzky, one NBA about Shaq, one NFL about Montana, one MLB about Jeter. Examples of sport variety: how many periods in hockey, what is a grand slam, what does MVP stand for, which city has won the most Super Bowls.',
           'VIDEO GAMES: Cover a wide range — console history (NES, SNES, PlayStation, Xbox, Nintendo Switch), popular franchises (Mario, Zelda, Call of Duty, FIFA, Minecraft, Fortnite, GTA, Pokemon), Steam/PC gaming, esports, gaming milestones, iconic characters, game developers. NOT just world records — ask about gameplay, lore, platforms, release facts, cultural impact.',
           'BOARD/CARD GAMES: Monopoly, Scrabble, chess, poker, Magic: The Gathering, Dungeons & Dragons, Wordle, game shows.',
@@ -344,6 +365,19 @@ async function generateBatch(batchNum, focusCategories, usedTopics) {
         await generateSearchQueries('MUSIC ' + eraFocus + ': pop rock hip hop country R&B artists albums chart records award moments collaborations', usedTopics),
       ];
       for (const queries of subTypeQueries) {
+        if (queries.length > 0) {
+          const result = await searchWeb(queries[0]);
+          if (result) searchResults.push(result);
+          await new Promise(r => setTimeout(r, 500));
+        }
+      }
+    } else if (category === 'Science & Nature') {
+      console.log('     [' + category + '] Running 2 sub-type searches (science / nature)...');
+      const sciNatQueries = [
+        await generateSearchQueries('SCIENCE ONLY: famous scientists discoveries breakthroughs, technology inventions who invented what, human body surprising facts, space exploration NASA discoveries, food science chemistry, surprising did-you-know science facts accessible', usedTopics),
+        await generateSearchQueries('NATURE ONLY: interesting animals behaviors records surprising facts, ocean sea life sharks whales, plants trees surprising facts, weather climate natural phenomena, environmental science conservation wins', usedTopics),
+      ];
+      for (const queries of sciNatQueries) {
         if (queries.length > 0) {
           const result = await searchWeb(queries[0]);
           if (result) searchResults.push(result);
