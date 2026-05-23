@@ -246,15 +246,7 @@ const S = {
   WINNER:           'winner',
 };
 
-// Short display names for categories that are too long for small UI
-const CAT_SHORT = {
-  'Geography':                   'Geography',
-  'TV, Movies & Music':          'TV & Music',
-  'History':                     'History',
-  'Science & Nature':            'Science',
-  'Sports & Games':              'Sports',
-  'Pop Culture & Current Events':'Pop Culture',
-};
+// Short display names removed — use full names everywhere
 
 // ─── OPENING SCENE ────────────────────────────────────────────────────────
 function IntroScene({ onDone }) {
@@ -345,8 +337,8 @@ function IntroScene({ onDone }) {
               }}>
                 {CAT_EMOJI[cat]}
               </div>
-              <div style={{ fontSize:10, color:CAT_COLORS[cat], fontFamily:'monospace', fontWeight:700, letterSpacing:0.5 }}>
-                {CAT_SHORT[cat]}
+              <div style={{ fontSize:9, color:CAT_COLORS[cat], fontFamily:'monospace', fontWeight:700, letterSpacing:0.5, textAlign:'center', lineHeight:1.3 }}>
+                {cat}
               </div>
             </div>
           ))}
@@ -1519,7 +1511,7 @@ export default function Game() {
                   alignItems:'center', gap:8, opacity: alreadyUsed ? 0.4 : 1,
                 }}>
                   <span style={{ fontSize:32 }}>{CAT_EMOJI[cat]}</span>
-                  <div style={{ fontSize:12, fontWeight:700, color: alreadyUsed ? '#333' : CAT_COLORS[cat], lineHeight:1.3 }}>{CAT_SHORT[cat]}</div>
+                  <div style={{ fontSize:10, fontWeight:700, color: alreadyUsed ? '#333' : CAT_COLORS[cat], lineHeight:1.3 }}>{cat}</div>
                   {alreadyUsed && <div style={{ fontSize:9, color:'#444', fontFamily:'monospace' }}>used</div>}
                 </button>
               );
@@ -1576,7 +1568,7 @@ export default function Game() {
                 }}>
                   <span style={{ fontSize:36 }}>{CAT_EMOJI[cat]}</span>
                   <div style={{ flex:1 }}>
-                    <div style={{ fontSize:20, fontWeight:700, color: pieReady ? '#fbbf24' : CAT_COLORS[cat] }}>{CAT_SHORT[cat]}</div>
+                    <div style={{ fontSize:16, fontWeight:700, color: pieReady ? '#fbbf24' : CAT_COLORS[cat], lineHeight:1.2 }}>{cat}</div>
                     <div style={{ fontSize:13, color:'#555', fontFamily:'monospace', marginTop:4 }}>
                       {alreadyOwned ? '✓ wedge owned'
                         : pieReady ? '🥧 PIE QUESTION READY!'
