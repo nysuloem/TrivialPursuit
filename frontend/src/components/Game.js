@@ -1547,7 +1547,7 @@ export default function Game() {
                   }}>
                     <span style={{ fontSize:36 }}>🎲</span>
                     <div>
-                      <div style={{ fontSize:20, fontWeight:700, color:'#22c55e' }}>Roll Again!</div>
+                      <div style={{ fontSize:16, fontWeight:700, color:'#22c55e' }}>Roll Again!</div>
                       <div style={{ fontSize:13, color:'#555', fontFamily:'monospace', marginTop:4 }}>tap to get two new categories</div>
                     </div>
                   </button>
