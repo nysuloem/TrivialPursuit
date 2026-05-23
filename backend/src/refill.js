@@ -243,7 +243,7 @@ async function generateQuestionsFromContent(category, content, count, isPieCateg
       ? [
           'SPORTS: Focus on major North American leagues from 1980s to present — NHL, NBA, NFL, MLB, PGA golf. Ask about BOTH iconic players AND the sports themselves. Player questions: records, career moments, nicknames, championships. Sport questions: rules, team histories, iconic games, stadium facts, draft moments, trades, dynasties, coaching legends. Spread across many different players and teams — do not ask two questions about the same player or team. Examples of player variety: one NHL question about Gretzky, one NBA about Shaq, one NFL about Montana, one MLB about Jeter. Examples of sport variety: how many periods in hockey, what is a grand slam, what does MVP stand for, which city has won the most Super Bowls.',
           'VIDEO GAMES: Cover a wide range — console history (NES, SNES, PlayStation, Xbox, Nintendo Switch), popular franchises (Mario, Zelda, Call of Duty, FIFA, Minecraft, Fortnite, GTA, Pokemon), Steam/PC gaming, esports, gaming milestones, iconic characters, game developers. NOT just world records — ask about gameplay, lore, platforms, release facts, cultural impact.',
-          'BOARD/CARD GAMES: Monopoly, Scrabble, chess, poker, Magic: The Gathering, Dungeons & Dragons, Wordle, game shows.',
+          'BOARD/CARD GAMES: Cover a wide variety — classic board games (chess, Scrabble, Risk, Clue, Battleship, Trivial Pursuit, Boggle), modern tabletop games (Catan, Ticket to Ride, Codenames, Pandemic), card games (poker, blackjack, Magic: The Gathering, Uno), role-playing games (Dungeons & Dragons), party games, game shows (Jeopardy, Wheel of Fortune, Price is Right), digital word games (Wordle). Ask about game history, weird rules, origin stories, record games, famous players. Every question should be about a DIFFERENT game.',
           'Keep teenage gamers engaged — at least 3-4 video game questions per batch covering both retro and modern titles.',
         ].join(' ')
       : category === 'Pop Culture & Current Events'
@@ -346,7 +346,7 @@ async function generateBatch(batchNum, focusCategories, usedTopics) {
       const subTypeQueries = [
         await generateSearchQueries('Sports & Games - SPORTS ONLY: NHL NBA NFL MLB PGA golf records stars moments', usedTopics),
         await generateSearchQueries('Sports & Games - VIDEO GAMES ONLY: Nintendo PlayStation Xbox Steam Minecraft Fortnite Mario Pokemon GTA console history', usedTopics),
-        await generateSearchQueries('Sports & Games - BOARD AND CARD GAMES ONLY: Monopoly chess poker Magic Gathering Dungeons Dragons Scrabble Wordle', usedTopics),
+        await generateSearchQueries('BOARD AND CARD GAMES ONLY: classic board game history facts weird rules, modern board games tabletop gaming, card game facts poker blackjack, chess history facts, role playing games history, party games trivia games history, game show facts Jeopardy Wheel of Fortune Price is Right, trading card games collectible games', usedTopics),
       ];
       for (const queries of subTypeQueries) {
         if (queries.length > 0) {
