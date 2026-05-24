@@ -5,6 +5,7 @@ const {
   getUnusedCount,
   getLowCategories,
   CATEGORIES,
+  listQuestions,
 } = require('./db');
 
 const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
@@ -12,16 +13,18 @@ const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 const MODEL = process.env.OPENAI_MODEL || 'gpt-4o';
 const NEWS_SEARCH_MODEL = process.env.OPENAI_NEWS_SEARCH_MODEL || 'gpt-4o';
 
-const REFILL_AMOUNT = parseInt(process.env.REFILL_AMOUNT || '250', 10);
-const THRESHOLD = parseInt(process.env.LOW_QUESTION_THRESHOLD || '250', 10);
 const SEARCH_DELAY_MS = parseInt(process.env.SEARCH_DELAY_MS || '450', 10);
 const BATCH_DELAY_MS = parseInt(process.env.BATCH_DELAY_MS || '1200', 10);
 const NEWS_SEARCH_TIMEOUT_MS = parseInt(process.env.NEWS_SEARCH_TIMEOUT_MS || '30000', 10);
 
-// Set this to true only if your database insert supports angle/difficulty/precise_era/topic_key.
 const DB_SUPPORTS_EXTENDED_FIELDS = process.env.DB_SUPPORTS_EXTENDED_FIELDS === 'true';
 
 let isRefilling = false;
+
+function getEnvInt(name, fallback) {
+  const n = parseInt(process.env[name] || '', 10);
+  return Number.isFinite(n) ? n : fallback;
+}
 
 const DISTRIBUTION = {
   Geography: { regular: 8, pie: 1 },
@@ -36,50 +39,20 @@ const DIFFICULTY_CYCLE = ['medium', 'medium', 'easy', 'medium', 'pie', 'medium']
 
 const ERA_POOLS = {
   'TV, Movies & Music': [
-    '1980s',
-    '1990s',
-    '2000s',
-    '2010s',
-    '2020s',
-    '1990s',
-    '2000s',
-    '1980s',
-    '2020s',
-    'timeless',
+    '1980s', '1990s', '2000s', '2010s', '2020s',
+    '1990s', '2000s', '1980s', '2020s', 'timeless',
   ],
   'Sports & Games': [
-    '1980s',
-    '1990s',
-    '2000s',
-    '2010s',
-    '2020s',
-    'timeless',
-    '1990s',
-    '2000s',
-    '2010s',
-    '2020s',
+    '1980s', '1990s', '2000s', '2010s', '2020s',
+    'timeless', '1990s', '2000s', '2010s', '2020s',
   ],
   'Pop Culture & Current Events': [
-    '2020s',
-    '2020s',
-    '2020s',
-    '2020s',
-    '2020s',
-    '2020s',
-    '2010s',
-    '2020s',
+    '2020s', '2020s', '2020s', '2020s',
+    '2020s', '2020s', '2010s', '2020s',
   ],
   'Science & Nature': [
-    'timeless',
-    'timeless',
-    '2020s',
-    '2010s',
-    '2000s',
-    '1990s',
-    'timeless',
-    '2020s',
-    'timeless',
-    '2010s',
+    'timeless', 'timeless', '2020s', '2010s', '2000s',
+    '1990s', 'timeless', '2020s', 'timeless', '2010s',
   ],
   Geography: ['timeless', 'timeless', '2020s', '2000s', '1990s'],
   History: ['timeless', '1980s', '1990s', '2000s', '2020s', 'classic'],
@@ -87,7 +60,8 @@ const ERA_POOLS = {
 
 const CATEGORY_SLOT_PLANS = {
   'Sports & Games': [
-    { subcategory: 'sports', count: 4 },
+    { subcategory: 'sports_general', count: 2 },
+    { subcategory: 'sports_culture', count: 2 },
     { subcategory: 'video_games', count: 3 },
     { subcategory: 'board_games', count: 2 },
     { subcategory: 'card_games', count: 1 },
@@ -111,7 +85,6 @@ const CATEGORY_SLOT_PLANS = {
     { subcategory: 'ecology', count: 1 },
   ],
 
-  // Balanced but not so news-heavy that focused Pop Culture top-ups get stuck.
   'Pop Culture & Current Events': [
     { subcategory: 'current_events', count: 3 },
     { subcategory: 'sports_news', count: 1 },
@@ -122,12 +95,13 @@ const CATEGORY_SLOT_PLANS = {
   ],
 
   Geography: [
-    { subcategory: 'cities', count: 2 },
+    { subcategory: 'cities', count: 1 },
     { subcategory: 'countries', count: 2 },
+    { subcategory: 'culture', count: 2 },
     { subcategory: 'borders', count: 1 },
     { subcategory: 'rivers', count: 1 },
-    { subcategory: 'mountains', count: 1 },
     { subcategory: 'records', count: 1 },
+    { subcategory: 'oceans_and_seas', count: 1 },
   ],
 
   History: [
@@ -143,20 +117,28 @@ const CATEGORY_SLOT_PLANS = {
 
 const QUESTION_ANGLES = {
   'Sports & Games': {
-    sports: [
+    sports_general: [
       'players_and_legends',
       'teams_and_rivalries',
-      'stadiums_and_arenas',
-      'broadcasters_and_media',
+      'famous_games_and_moments',
       'rules_and_penalties',
       'trophies_and_championships',
-      'logos_uniforms_and_mascots',
       'coaches_and_managers',
       'olympic_moments',
-      'sports_business_and_expansion',
-      'famous_games_and_moments',
       'canadian_sports_culture',
     ],
+
+    sports_culture: [
+      'stadiums_and_arenas',
+      'broadcasters_and_media',
+      'logos_uniforms_and_mascots',
+      'sports_business_and_expansion',
+      'sports_movies_and_media',
+      'fan_traditions',
+      'sports_equipment',
+      'league_history',
+    ],
+
     video_games: [
       'console_history',
       'iconic_characters',
@@ -171,6 +153,7 @@ const QUESTION_ANGLES = {
       'gaming_music_and_sound',
       'gaming_cultural_impact',
     ],
+
     board_games: [
       'classic_board_games',
       'modern_board_games',
@@ -183,6 +166,7 @@ const QUESTION_ANGLES = {
       'family_games',
       'game_components',
     ],
+
     card_games: [
       'poker',
       'blackjack',
@@ -396,23 +380,27 @@ const QUESTION_ANGLES = {
     cities: [
       'landmarks',
       'city_nicknames',
-      'population',
       'host_cities',
       'urban_features',
+      'famous_streets',
+      'city_history',
     ],
     countries: [
       'flags',
       'capitals',
-      'borders',
       'name_changes',
       'islands',
       'country_records',
+      'national_symbols',
+      'native_languages',
+      'fun_country_facts',
     ],
     borders: [
       'unusual_borders',
       'landlocked_countries',
       'enclaves',
       'border_changes',
+      'famous_crossings',
     ],
     rivers: ['famous_rivers', 'river_records', 'river_cities', 'waterfalls'],
     mountains: [
@@ -426,6 +414,22 @@ const QUESTION_ANGLES = {
       'hottest_coldest',
       'northernmost_southernmost',
       'geographic_extremes',
+      'population_records',
+      'climate_records',
+    ],
+    culture: [
+      'food_and_cuisine',
+      'languages_and_dialects',
+      'religions_and_traditions',
+      'famous_landmarks_and_wonders',
+      'canadian_geography',
+      'north_american_geography',
+    ],
+    oceans_and_seas: [
+      'ocean_records',
+      'famous_seas',
+      'ocean_features',
+      'island_chains',
     ],
   },
 
@@ -470,7 +474,6 @@ const QUESTION_ANGLES = {
 };
 
 const ANGLE_SEARCH_GUIDANCE = {
-  // Sports & games
   players_and_legends:
     'famous athletes, nicknames, iconic career moments, recognizable stars only; avoid obscure stat-only trivia',
   teams_and_rivalries:
@@ -495,6 +498,14 @@ const ANGLE_SEARCH_GUIDANCE = {
     'iconic games, buzzer beaters, miracle comebacks, famous goals, recognizable moments',
   canadian_sports_culture:
     'Hockey Night in Canada, Grey Cup, Canadian athletes, Canadian teams, curling, Olympics, sports traditions',
+  sports_movies_and_media:
+    'sports movies, documentaries, TV coverage, famous sports media moments, ESPN/TSN/Sportsnet/CBC culture',
+  fan_traditions:
+    'fan chants, team traditions, tailgating, playoff rituals, famous celebrations, national sports customs',
+  sports_equipment:
+    'sports equipment, balls, sticks, skates, helmets, uniforms, protective gear, equipment changes',
+  league_history:
+    'league history, expansion, mergers, relocations, rule eras, original teams, league traditions',
 
   console_history:
     'Nintendo, Sega, PlayStation, Xbox, console launches, hardware features, console wars, sales milestones',
@@ -540,7 +551,6 @@ const ANGLE_SEARCH_GUIDANCE = {
   game_components:
     'dice, meeples, tokens, spinners, boards, cards, timers, game pieces and their origins',
 
-  // Science
   animal_behavior:
     'animal behavior facts involving familiar animals; focus on surprising behavior with a clear explanation, not simple records',
   animal_physiology:
@@ -698,7 +708,6 @@ const ANGLE_SEARCH_GUIDANCE = {
   climate_impacts:
     'climate impacts on animals, plants, migration, coral bleaching, forests, crops; accessible and evidence-based',
 
-  // News/current events
   major_news:
     'major news stories from Canada, the United States, and the world from the last 6 months',
   world_events:
@@ -737,7 +746,6 @@ const ANGLE_SEARCH_GUIDANCE = {
   canadian_sports_news:
     'major Canadian sports headlines from the last 6 months from TSN, Sportsnet, CBC, NHL, NBA, MLB, Olympics',
 
-  // Pop culture but not music
   memes:
     'widely known memes, internet phrases, meme images, mainstream online jokes; not music',
   internet_phrases:
@@ -791,12 +799,100 @@ const ANGLE_SEARCH_GUIDANCE = {
   widely_known_online_moments:
     'widely known online moments from TikTok, YouTube, Instagram, Reddit, Twitch, and Twitter/X; not songs or music videos',
 
+  landmarks:
+    'famous world landmarks and monuments: Eiffel Tower, Big Ben, Colosseum, Great Wall, Statue of Liberty, CN Tower, Niagara Falls; surprising facts about them',
+  city_nicknames:
+    'city nicknames and why they exist: The Big Apple, Windy City, Sin City, The Big Easy, Venice of the North; accessible and fun',
+  host_cities:
+    'cities that hosted Olympics, World Cups, World Expositions, major summits; surprising host city facts',
+  urban_features:
+    'famous city features: Times Square, London Eye, Hollywood sign, Golden Gate Bridge, unusual city layouts, city records',
+  famous_streets:
+    'famous streets and roads: Champs-Elysees, Bourbon Street, Route 66, Abbey Road, Wall Street; surprising facts',
+  city_history:
+    'surprising city history facts: how cities got their names, famous historical events in cities, cities that changed names',
+  flags:
+    'country and province flag facts: colours, symbols, meaning, unusual flags, flag changes, flags with animals or landmarks',
+  capitals:
+    'capital city facts: surprising capitals, capitals that changed, small capitals of large countries, capitals not on maps where you expect',
+  name_changes:
+    'countries, cities, and places that changed names: Rhodesia, Bombay, Constantinople, Persia, Siam; why they changed',
+  islands:
+    'famous and surprising island facts: largest islands, island nations, islands with unusual histories, Canadian Arctic islands',
+  country_records:
+    'country records: largest, smallest, most populated, least populated, highest, lowest, oldest, newest countries; surprising facts',
+  national_symbols:
+    'national symbols: animals, plants, foods, flags, anthems; surprising choices and why they were chosen',
+  native_languages:
+    'languages of the world: most spoken languages, official languages of countries, endangered languages, language families, surprising language facts',
+  fun_country_facts:
+    'fun and surprising country facts: countries with no rivers, countries sharing names with US states, only country with a non-rectangular flag, surprising geography quirks',
+  unusual_borders:
+    'unusual and surprising borders: countries within countries, countries that share a border no one expects, strangest borders in the world',
+  landlocked_countries:
+    'landlocked countries and surprising geography: doubly landlocked countries, countries with no coastline, surprising landlocked facts',
+  enclaves:
+    'enclaves and exclaves: countries inside other countries, Lesotho inside South Africa, San Marino inside Italy, surprising territorial anomalies',
+  border_changes:
+    'famous border changes in history: post-WW2 borders, breakups of countries, new countries formed, surprising historical border shifts',
+  famous_crossings:
+    'famous borders and crossings: longest undefended border, busiest border crossing, surprising facts about famous borders',
+  famous_rivers:
+    'famous rivers: Nile, Amazon, Mississippi, St. Lawrence, Yangtze, Rhine; surprising river facts and records',
+  river_records:
+    'river records: longest, widest, deepest, most polluted, rivers that flow north, rivers with unusual features',
+  river_cities:
+    'famous cities built on rivers: Paris on the Seine, London on the Thames, Cairo on the Nile, cities that grew because of rivers',
+  waterfalls:
+    'famous waterfalls: Niagara, Victoria, Angel Falls, highest, widest, most visited; surprising facts',
+  famous_mountains:
+    'famous mountains: Everest, K2, Kilimanjaro, Fuji, Rockies, Alps; surprising facts about famous peaks',
+  mountain_records:
+    'mountain records: highest, most prominent, deadliest to climb, mountains with surprising locations or features',
+  mountain_ranges:
+    'famous mountain ranges: Himalayas, Andes, Rockies, Alps, Appalachians; countries they cross, lengths, surprising facts',
+  largest_smallest:
+    'geographic largest and smallest: largest country, smallest country, largest lake, largest desert, surprising size comparisons',
+  hottest_coldest:
+    'temperature extremes: hottest inhabited place, coldest city, hottest desert, surprising climate extremes',
+  northernmost_southernmost:
+    'extreme locations: northernmost city, southernmost capital, easternmost country, geographic extremes with surprising answers',
+  geographic_extremes:
+    'surprising geographic extremes: deepest lake, highest navigable lake, most remote inhabited island, geographic superlatives',
+  population_records:
+    'population geography: most densely populated places, least populated countries, cities growing fastest, surprising population facts',
+  climate_records:
+    'climate records: most rainfall, most sunshine, wettest city, driest desert, snowiest city; surprising climate facts',
+  food_and_cuisine:
+    'food geography: where foods originated, countries famous for certain foods, surprising origins of common foods, national dishes',
+  languages_and_dialects:
+    'language geography: countries with most official languages, where French is spoken outside France, surprising language distribution facts',
+  religions_and_traditions:
+    'cultural geography: surprising cultural traditions by country, unusual public holidays, cultural practices tied to geography',
+  famous_landmarks_and_wonders:
+    'world wonders and landmarks: Seven Wonders, UNESCO sites, natural wonders, man-made landmarks with surprising facts',
+  canadian_geography:
+    'Canadian geography: largest provinces, longest rivers, famous lakes, national parks, surprising Canadian geography facts',
+  north_american_geography:
+    'North American geography: Great Lakes facts, longest rivers, mountain ranges, state/province capital surprises, geography records',
+  ocean_records:
+    'ocean records: deepest point, largest ocean, saltiest sea, warmest ocean, surprising ocean facts',
+  famous_seas:
+    'famous seas and bodies of water: Dead Sea, Caspian Sea, Mediterranean, Caribbean; surprising facts',
+  ocean_features:
+    'ocean features: trenches, currents, gyres, coral reefs; surprising facts about the ocean floor and currents',
+  island_chains:
+    'island chains and archipelagos: Hawaii, Philippines, Indonesia, Caribbean; surprising facts about island groups',
+
   default:
     'recognizable North American family trivia topic with an interesting clue, not obscure specialist material',
 };
 
 const VALID_SUBCATEGORIES = {
   'Sports & Games': [
+    'sports',
+    'sports_general',
+    'sports_culture',
     'nhl',
     'nba',
     'nfl',
@@ -805,7 +901,6 @@ const VALID_SUBCATEGORIES = {
     'olympics',
     'tennis',
     'soccer',
-    'sports',
     'video_games',
     'board_games',
     'card_games',
@@ -836,7 +931,7 @@ const VALID_SUBCATEGORIES = {
     'teen_culture',
     'viral',
   ],
-  Geography: ['capitals', 'countries', 'rivers', 'mountains', 'records', 'cities', 'borders'],
+  Geography: ['capitals', 'countries', 'rivers', 'mountains', 'records', 'cities', 'borders', 'culture', 'oceans_and_seas'],
   History: [
     'ancient',
     'medieval',
@@ -874,8 +969,10 @@ const QUESTION_SYSTEM_PROMPT = [
   'NO AS-OF PHRASING: Never write "as of 2024", "currently", or "at the time". State years naturally when relevant.',
   '',
   '=== SPORTS & GAMES DIVERSITY RULES ===',
-  'Sports questions must NOT default to player statistics. No more than half of sports questions should be about individual athletes.',
-  'Rotate across athletes, teams, stadiums/arenas, broadcasters/media, trophies/championships, rules/penalties, mascots/logos/uniforms, league expansion/relocation/drafts/trades, famous games, and Canadian sports culture.',
+  'Sports & Games must contain real sports questions as well as game questions.',
+  'Sports questions must NOT default to player statistics.',
+  'Sports questions should rotate across athletes, teams, venues, broadcasters/media, trophies/championships, rules, mascots/logos/uniforms, league expansion/relocation, famous games, fan traditions, equipment, and Canadian sports culture.',
+  'A sports question does not need to be about a player. Stadiums, arenas, broadcasters, trophies, mascots, rules, leagues, equipment, and famous moments are all good.',
   'Video game questions must rotate across consoles, characters, gameplay mechanics, developers/studios, franchises, music/sound, arcade history, handheld systems, PC gaming, esports, mobile games, and cultural impact.',
   'Board/card game questions must rotate across classic games, modern tabletop games, party games, word games, strategy games, card games, trading card games, pieces/components, rules/scoring, inventors, and origin stories.',
   '',
@@ -908,13 +1005,11 @@ function sleep(ms) {
 
 function withTimeout(promise, ms, label = 'operation') {
   let timer;
-
   const timeout = new Promise((_, reject) => {
     timer = setTimeout(() => {
       reject(new Error(label + ' timed out after ' + ms + ' ms'));
     }, ms);
   });
-
   return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
 }
 
@@ -938,15 +1033,9 @@ function normalizeCategory(cat) {
 
   const lower = c.toLowerCase();
 
-  if (
-    lower.includes('tv') ||
-    lower.includes('movie') ||
-    lower.includes('music') ||
-    lower.includes('entertainment')
-  ) {
+  if (lower.includes('tv') || lower.includes('movie') || lower.includes('music') || lower.includes('entertainment')) {
     return 'TV, Movies & Music';
   }
-
   if (
     lower.includes('pop culture') ||
     lower.includes('current event') ||
@@ -958,7 +1047,6 @@ function normalizeCategory(cat) {
   ) {
     return 'Pop Culture & Current Events';
   }
-
   if (lower.includes('geograph')) return 'Geography';
   if (lower.includes('histor')) return 'History';
   if (lower.includes('science') || lower.includes('nature')) return 'Science & Nature';
@@ -975,7 +1063,8 @@ function normalizeSubcategory(category, subcategory) {
     .replace(/^_|_$/g, '');
 
   if (category === 'Sports & Games') {
-    if (safe === 'sports') return 'sports';
+    if (safe === 'sports' || safe === 'sport' || safe.includes('athlete') || safe.includes('team')) return 'sports_general';
+    if (safe.includes('stadium') || safe.includes('arena') || safe.includes('broadcaster') || safe.includes('mascot') || safe.includes('logo') || safe.includes('league')) return 'sports_culture';
     if (safe.includes('video')) return 'video_games';
     if (safe.includes('board')) return 'board_games';
     if (safe.includes('card') || safe.includes('poker') || safe.includes('uno')) return 'card_games';
@@ -990,30 +1079,9 @@ function normalizeSubcategory(category, subcategory) {
   }
 
   if (category === 'Science & Nature') {
-    if (
-      safe.includes('earth') ||
-      safe.includes('geology') ||
-      safe.includes('volcano') ||
-      safe.includes('earthquake')
-    ) {
-      return 'earth_science';
-    }
-    if (
-      safe.includes('eco') ||
-      safe.includes('conservation') ||
-      safe.includes('pollination') ||
-      safe.includes('symbiosis')
-    ) {
-      return 'ecology';
-    }
-    if (
-      safe.includes('medic') ||
-      safe.includes('health') ||
-      safe.includes('vaccine') ||
-      safe.includes('drug')
-    ) {
-      return 'medicine';
-    }
+    if (safe.includes('earth') || safe.includes('geology') || safe.includes('volcano') || safe.includes('earthquake')) return 'earth_science';
+    if (safe.includes('eco') || safe.includes('conservation') || safe.includes('pollination') || safe.includes('symbiosis')) return 'ecology';
+    if (safe.includes('medic') || safe.includes('health') || safe.includes('vaccine') || safe.includes('drug')) return 'medicine';
     if (safe.includes('food')) return 'food_science';
     if (safe.includes('animal')) return 'animals';
     if (safe.includes('plant')) return 'plants';
@@ -1078,54 +1146,72 @@ function legacyEra(era) {
   return 'timeless';
 }
 
+function normalizeTextForSimilarity(text) {
+  return String(text || '')
+    .toLowerCase()
+    .replace(/&/g, ' and ')
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function isBroadReusableAnswer(answer) {
+  const normalized = normalizeTextForSimilarity(answer);
+  const broadAnswers = new Set([
+    'canada', 'united states', 'usa', 'america', 'north america',
+    'toronto', 'ontario', 'quebec', 'vancouver', 'ottawa', 'montreal',
+    'new york', 'california', 'florida', 'texas',
+    'england', 'united kingdom', 'france', 'germany', 'china', 'japan', 'india', 'australia',
+    'europe', 'africa', 'asia',
+    'nasa', 'disney', 'nintendo', 'sony', 'microsoft', 'apple', 'google', 'amazon', 'meta', 'netflix',
+    'youtube', 'tiktok', 'instagram', 'facebook', 'twitter', 'x',
+    'cbc', 'cnn', 'bbc',
+    'nhl', 'nba', 'nfl', 'mlb', 'olympics',
+  ]);
+  return broadAnswers.has(normalized);
+}
+
+function wordSet(text) {
+  const stopWords = new Set([
+    'this', 'that', 'which', 'what', 'when', 'where', 'whose',
+    'about', 'after', 'before', 'from', 'with', 'into', 'during',
+    'would', 'could', 'should', 'have', 'has', 'had', 'were', 'was', 'are',
+    'the', 'and', 'for', 'its', 'his', 'her', 'their', 'they', 'them',
+    'who', 'why', 'how', 'name', 'known', 'called',
+  ]);
+
+  return new Set(
+    normalizeTextForSimilarity(text)
+      .split(' ')
+      .filter(w => w.length > 3 && !stopWords.has(w))
+  );
+}
+
+function jaccardSimilarity(a, b) {
+  const setA = wordSet(a);
+  const setB = wordSet(b);
+  if (setA.size === 0 || setB.size === 0) return 0;
+
+  let overlap = 0;
+  for (const word of setA) {
+    if (setB.has(word)) overlap++;
+  }
+
+  const union = new Set([...setA, ...setB]).size;
+  return overlap / union;
+}
+
 function answerInQuestion(question, answer) {
   if (!question || !answer) return false;
 
   const q = String(question).toLowerCase();
 
   const stopWords = new Set([
-    'the',
-    'a',
-    'an',
-    'of',
-    'in',
-    'on',
-    'at',
-    'to',
-    'for',
-    'is',
-    'was',
-    'are',
-    'were',
-    'and',
-    'or',
-    'but',
-    'it',
-    'its',
-    'this',
-    'that',
-    'these',
-    'those',
-    'by',
-    'with',
-    'from',
-    'as',
-    'be',
-    'been',
-    'has',
-    'had',
-    'have',
-    'which',
-    'who',
-    'what',
-    'where',
-    'when',
-    'how',
-    'not',
-    'no',
-    'do',
-    'did',
-    'does',
+    'the', 'a', 'an', 'of', 'in', 'on', 'at', 'to', 'for',
+    'is', 'was', 'are', 'were', 'and', 'or', 'but', 'it', 'its',
+    'this', 'that', 'these', 'those', 'by', 'with', 'from', 'as',
+    'be', 'been', 'has', 'had', 'have', 'which', 'who', 'what',
+    'where', 'when', 'how', 'not', 'no', 'do', 'did', 'does',
   ]);
 
   const answerWords = String(answer)
@@ -1145,8 +1231,12 @@ function hasBannedEnding(question) {
 function classifyQuestionType(question) {
   const q = String(question || '').toLowerCase();
 
-  if (/\b(player|athlete|scored|goals|points|home runs|touchdowns|mvp|hart|heisman|batting|yards|assists|rebounds|wins above replacement)\b/.test(q)) {
+  if (/\b(player|athlete|mvp|hart|heisman|batting|wins above replacement)\b/.test(q)) {
     return 'player_stat';
+  }
+
+  if (/\b(scored|goals|points|home runs|touchdowns|yards|assists|rebounds)\b/.test(q)) {
+    return 'sports_scoring';
   }
 
   if (/\b(stadium|arena|field|ballpark|centre|center|dome|garden|rink|court|course)\b/.test(q)) {
@@ -1236,10 +1326,17 @@ function tooManySimilarQuestions(currentQuestions, newQuestion) {
   const sameAngle = recent.filter(q => q.angle === angle).length;
   const sameSubcategory = recent.filter(q => q.subcategory === subcategory).length;
 
-  if (type === 'player_stat' && sameType >= 1) return true;
+  // This used to be >= 1, which was too harsh and caused sports slots to die.
+  if (type === 'player_stat' && sameType >= 2) return true;
+
+  // Let sports scoring appear a bit more often than pure stat trivia.
+  if (type === 'sports_scoring' && sameType >= 2) return true;
+
   if (sameType >= 3) return true;
-  if (sameAngle >= 1) return true;
-  if (subcategory === 'sports' && sameSubcategory >= 4) return true;
+  if (sameAngle >= 2) return true;
+
+  // Sports is now split, so do not block all sports too aggressively.
+  if ((subcategory === 'sports_general' || subcategory === 'sports_culture') && sameSubcategory >= 3) return true;
 
   return false;
 }
@@ -1262,20 +1359,122 @@ function makeTopicKey(q) {
     q.category,
     q.subcategory,
     q.angle,
-    String(q.answer || '').toLowerCase().replace(/[^a-z0-9]/g, ''),
+    normalizeTextForSimilarity(q.answer),
   ].join(':');
 }
 
 function looksLikeRepeat(q, usedTopics) {
   if (!q || !q.answer) return false;
 
-  const answer = String(q.answer).toLowerCase().trim();
-  const key = makeTopicKey(q);
+  const answer = normalizeTextForSimilarity(q.answer);
+  const topicKey = makeTopicKey(q);
 
-  return usedTopics.some(t => {
-    const s = String(t).toLowerCase();
-    return s === answer || s === key || (answer.length > 4 && s.includes(answer));
-  });
+  for (const item of usedTopics) {
+    if (!item) continue;
+
+    if (typeof item === 'object') {
+      const sameCategory = item.category === q.category;
+      const sameSubcategory = item.subcategory === q.subcategory;
+      const sameAngle = item.angle === q.angle;
+      const sameAnswer = normalizeTextForSimilarity(item.answer) === answer;
+      const wordingSimilarity = jaccardSimilarity(item.question, q.question);
+
+      if (sameCategory && wordingSimilarity >= 0.72) return true;
+
+      if (
+        sameCategory &&
+        sameSubcategory &&
+        sameAngle &&
+        sameAnswer &&
+        !isBroadReusableAnswer(answer)
+      ) {
+        return true;
+      }
+
+      if (
+        sameCategory &&
+        sameAnswer &&
+        isBroadReusableAnswer(answer) &&
+        wordingSimilarity >= 0.45
+      ) {
+        return true;
+      }
+
+      continue;
+    }
+
+    const s = normalizeTextForSimilarity(item);
+
+    if (s === normalizeTextForSimilarity(topicKey)) return true;
+    if (s === answer && !isBroadReusableAnswer(answer)) return true;
+  }
+
+  return false;
+}
+
+function firstMeaningfulWords(text, count) {
+  return Array.from(wordSet(text)).slice(0, count).join(' ');
+}
+
+async function getExistingQuestionsForCategory(category, dbQuestionCache) {
+  if (dbQuestionCache.has(category)) return dbQuestionCache.get(category);
+
+  const allRows = [];
+  let page = 1;
+  const limit = 1000;
+
+  try {
+    while (true) {
+      const result = await listQuestions({ page, limit, category });
+      const rows = result.questions || [];
+      allRows.push(...rows);
+
+      if (!result.totalPages || page >= result.totalPages) break;
+      page++;
+    }
+
+    dbQuestionCache.set(category, allRows);
+    console.log('   Loaded ' + allRows.length + ' existing DB questions for ' + category);
+    return allRows;
+  } catch (err) {
+    console.log('   Could not load existing DB questions for duplicate check: ' + err.message);
+    dbQuestionCache.set(category, []);
+    return [];
+  }
+}
+
+async function looksLikeDatabaseDuplicate(q, dbQuestionCache) {
+  if (!q || !q.question || !q.answer || !q.category) return false;
+
+  const existing = await getExistingQuestionsForCategory(q.category, dbQuestionCache);
+  const newAnswer = normalizeTextForSimilarity(q.answer);
+  const newQuestionNorm = normalizeTextForSimilarity(q.question);
+
+  for (const old of existing) {
+    const oldQuestion = old.question || '';
+    const oldAnswer = old.answer || '';
+    const oldAnswerNorm = normalizeTextForSimilarity(oldAnswer);
+    const oldQuestionNorm = normalizeTextForSimilarity(oldQuestion);
+    const sameAnswer = oldAnswerNorm === newAnswer;
+    const wordingSimilarity = jaccardSimilarity(oldQuestion, q.question);
+
+    if (oldQuestionNorm === newQuestionNorm) return true;
+    if (wordingSimilarity >= 0.82) return true;
+
+    if (sameAnswer && !isBroadReusableAnswer(newAnswer) && wordingSimilarity >= 0.45) return true;
+
+    if (
+      sameAnswer &&
+      !isBroadReusableAnswer(newAnswer) &&
+      firstMeaningfulWords(oldQuestion, 6) === firstMeaningfulWords(q.question, 6)
+    ) {
+      return true;
+    }
+
+    if (sameAnswer && isBroadReusableAnswer(newAnswer) && wordingSimilarity >= 0.5) return true;
+  }
+
+  return false;
 }
 
 function sourceRequired(slot) {
@@ -1343,6 +1542,16 @@ function buildSlotsForCategory(category, batchNum, desiredCount, pieCategory) {
 function buildSearchQuery(slot) {
   const guidance = ANGLE_SEARCH_GUIDANCE[slot.angle] || ANGLE_SEARCH_GUIDANCE.default;
   const eraText = slot.era === 'timeless' ? '' : slot.era;
+
+  if (slot.category === 'Sports & Games') {
+    return [
+      eraText,
+      guidance,
+      'family trivia accessible North America Canada',
+      'if sports, include non-player topics such as teams venues broadcasters trophies rules mascots leagues traditions equipment and famous moments',
+      'avoid making every sports question about player stats',
+    ].filter(Boolean).join(' ');
+  }
 
   if (slot.category === 'Science & Nature') {
     return [
@@ -1452,27 +1661,23 @@ function stablePopCultureFallback(slot) {
       'Use celebrity topics only when they are not music-category questions.',
       'Good: celebrity brands, fashion, red carpets, movie roles, reality TV, interviews, public relationships, social media moments, acting roles, sports-team ownership, business ventures.',
       'Avoid: songs, albums, chart records, Grammy wins, concert tours, music videos, bands, singers as musicians, rappers as musicians, and music-industry achievements.',
-      'Possible non-music examples: Ryan Reynolds and Mint Mobile/Wrexham, The Rock and movies/businesses, Zendaya fashion/acting, Kardashians reality TV/brands, Barbie press tour, celebrity-owned brands.',
     ].join('\n'),
 
     internet_culture: [
       'Use mainstream internet culture that reached broad awareness.',
       'Good: memes, YouTube milestones, TikTok formats, Twitch/streaming, social media apps, viral videos, internet phrases, online platforms.',
-      'Avoid: songs, albums, chart records, Grammy wins, concert tours, music videos, bands, singers as musicians, and music-industry questions.',
-      'Possible examples: MrBeast, Wordle, TikTok, BeReal, Instagram, Snapchat, Twitter/X, Twitch, Reddit, Discord, viral memes, platform changes.',
+      'Avoid music-category facts.',
     ].join('\n'),
 
     teen_culture: [
       'Use teen/youth culture beyond music.',
       'Good: apps, games, toys, collectibles, slang, school trends, fashion items, viral products, gaming crossovers.',
-      'Avoid: songs, albums, chart records, Grammy wins, concert tours, music videos, bands, singers as musicians, and music-industry questions.',
-      'Possible examples: Roblox, Fortnite, Minecraft, Nintendo Switch, Stanley cups, Squishmallows, Prime drink, Snapchat, TikTok, filters, slang.',
+      'Avoid music-category facts.',
     ].join('\n'),
 
     viral: [
       'Use widely known viral internet moments, memes, phrases, apps, or challenges.',
       'Avoid music-based viral songs, chart achievements, albums, Grammy wins, concert tours, and music videos.',
-      'Choose only trends that reached mainstream awareness, not tiny niche memes.',
     ].join('\n'),
   };
 
@@ -1480,7 +1685,6 @@ function stablePopCultureFallback(slot) {
     'Use only stable, widely recognized pop-culture knowledge.',
     'Do not claim anything is the latest, newest, current, or recent.',
     'This category must NOT duplicate TV, Movies & Music.',
-    'Do not write questions where the answer depends on a song, album, chart record, Grammy win, concert tour, band, singer-as-musician, rapper-as-musician, lyric, music video, or music-industry achievement.',
     'The answer should be recognizable to at least one generation, and the clue should help the others guess.',
     '',
     'Topic area:',
@@ -1557,6 +1761,7 @@ async function searchWeb(query, requireFresh = false) {
               'Find 4-6 trivia-worthy facts with recognizable answers and helpful context.',
               'Prioritize facts that are accessible to a Canadian/North American family.',
               'Avoid obscure specialist facts and minor names.',
+              'If this is Sports & Games, include a mix of sports and games, and do not make all sports questions player-stat questions.',
               'If this is Science & Nature, avoid elementary-school obvious facts and instead find familiar answers connected to mechanisms, adaptations, discoveries, comparisons, or applications.',
               'If this is Pop Culture & Current Events, avoid music-category facts about songs, albums, chart records, Grammys, tours, bands, singers, rappers, lyrics, and music videos.',
             ].join('\n'),
@@ -1590,6 +1795,7 @@ async function searchWeb(query, requireFresh = false) {
             'The answer should be widely recognizable. The clue can be interesting but not obscure.',
             'Avoid exact dates, niche records, specialist facts, and minor names.',
             'Do not claim anything is current, latest, newest, or recent.',
+            'If this is Sports & Games, include non-player sports topics as well as games.',
             'If this is Science & Nature, avoid elementary-school obvious facts and instead use mechanisms, adaptations, discoveries, comparisons, or applications.',
             'If this is Pop Culture & Current Events, avoid music-category facts about songs, albums, chart records, Grammys, tours, bands, singers, rappers, lyrics, and music videos.',
           ].join('\n'),
@@ -1621,14 +1827,20 @@ async function generateQuestionForSlot(slot, content, usedTopics) {
     content || 'No source material available. Use only broadly known, stable general knowledge.',
     '',
     'Recently used topics to avoid:',
-    usedTopics.slice(-100).join(', ') || 'none',
+    usedTopics
+      .slice(-60)
+      .map(t => (typeof t === 'object' ? t.answer + ' / ' + t.question : String(t)))
+      .join(', ') || 'none',
     '',
     'Critical rules:',
     '- The answer must be recognizable to at least one generation at a family game table.',
     '- The clue can teach something new, but the answer itself should not be obscure.',
     '- Do not ask for an isolated statistic unless the statistic is iconic.',
-    '- Do not default to player records.',
     '- Respect the exact subcategory, angle, era, and difficulty from the slot.',
+    '- For Sports & Games, if the slot is sports_general or sports_culture, write a real sports question, not a video game or board game question.',
+    '- For sports_general, athletes are allowed, but teams, championships, rules, trophies, famous moments, and Canadian sports culture are also good.',
+    '- For sports_culture, prefer stadiums, arenas, broadcasters, mascots, uniforms, fan traditions, league history, equipment, or sports media.',
+    '- Do not default every sports question to a player stat.',
     '- For 1980s, 1990s, and 2000s slots, choose content genuinely associated with that decade.',
     '- For timeless slots, choose broadly familiar facts not tied to one news cycle.',
     '- For Science & Nature, avoid elementary-school obvious questions. Ask about mechanisms, adaptations, discoveries, comparisons, or applications.',
@@ -1637,6 +1849,8 @@ async function generateQuestionForSlot(slot, content, usedTopics) {
     '- For current_events and sports_news, include the year or month naturally in the clue if needed.',
     '- For current_events and sports_news, do not write vague questions like "Which country was in the news?" Be specific enough to be fair.',
     '- For current_events and sports_news, do not call a past event a future event if its date is before today.',
+    '- Reusing broad answers like Canada, NASA, Nintendo, or Toronto is allowed if the actual question topic is different.',
+    '- Do not simply reword a question that already appeared in recently used topics.',
     '- For celebrity_lifestyle, internet_culture, teen_culture, and viral questions, do not claim something is latest/current unless source material says so.',
     '- For Pop Culture & Current Events, do not write a music question. Avoid songs, albums, chart records, Grammys, tours, bands, singers as musicians, rappers as musicians, lyrics, music videos, and music-industry achievements.',
     '- Musicians can appear in Pop Culture only for clearly non-music reasons: acting roles, brands, fashion, social media, public relationships, business ventures, sports ownership, or widely discussed public moments.',
@@ -1720,6 +1934,10 @@ async function rewriteQuestion(q) {
 async function validateQuestion(q) {
   const today = todayLong();
 
+  const isCurrentNewsQuestion =
+    q.category === 'Pop Culture & Current Events' &&
+    (q.subcategory === 'current_events' || q.subcategory === 'sports_news');
+
   const prompt = [
     'Evaluate this trivia question for a Canadian family board game.',
     '',
@@ -1732,18 +1950,28 @@ async function validateQuestion(q) {
     JSON.stringify(q, null, 2),
     '',
     'Score from 1 to 5:',
-    '- recognizability: Is the answer familiar to many people?',
+    '- recognizability: For classic trivia, is the answer familiar to many people? For current_events and sports_news, is the story recognizable as a mainstream headline or made fair by the clue?',
     '- clue_helpfulness: Does the question give enough context?',
     '- obscurity_risk: Is this too niche or specialist?',
     '- diversity_value: Does this add variety compared with common trivia questions?',
     '',
     'Reject questions that are too obscure, too stat-heavy, too specialist, misleading, ambiguous, or only answerable by a superfan.',
     'For pie questions, allow slightly harder clues, but still require a recognizable answer.',
+    'For Sports & Games, reject if a sports slot produced a video game, board game, or card game question.',
+    'For Sports & Games, do not reject a sports question merely because it is not about a player. Venues, broadcasters, mascots, trophies, rules, teams, leagues, fan traditions, and equipment are valid sports topics.',
     'For Science & Nature, reject elementary-school obvious questions such as basic planet facts, basic animal records, or simple definitions.',
     'For Pop Culture & Current Events, teen-culture answers may be generation-specific, but the clue must be helpful.',
     'Reject Pop Culture & Current Events questions if they really belong in the Music category: songs, albums, chart records, Grammys, concert tours, music videos, singers-as-musicians, rappers-as-musicians, bands, lyrics, or music-industry achievements.',
-    'For current_events and sports_news, reject the question only if it seems stale, unsourced, vague, inaccurate, clearly after today, or not based on a recognizable recent story.',
+    '',
+    'Special rule for current_events and sports_news:',
+    'For current_events and sports_news, do not apply the same recognizability standard used for classic trivia.',
+    'For current_events and sports_news, do not reject a question merely because the event is very recent or not yet classic trivia.',
+    'For current_events and sports_news, a question can be kept if it is based on a mainstream headline, has a clear clue, and has a fair answer.',
+    'For current_events and sports_news, prioritize headline relevance, freshness, and clue fairness over long-term cultural familiarity.',
+    'For current_events and sports_news, reject the question only if it seems stale, unsourced, vague, inaccurate, clearly after today, too obscure, or not based on a mainstream recent story.',
     'For current_events and sports_news, treat events from the last 6 months as recent, as long as they occurred before today.',
+    '',
+    'Do not reject a question merely because the answer is a broad place or organization, such as Canada, NASA, Toronto, or Nintendo. Broad answers are acceptable when the clue is specific and the topic is different.',
     '',
     'Return ONLY valid JSON:',
     '{ "keep": true, "recognizability": 4, "clue_helpfulness": 4, "obscurity_risk": 2, "diversity_value": 4, "reason": "..." }',
@@ -1769,6 +1997,16 @@ async function validateQuestion(q) {
       clue >= 3 &&
       obscurity <= 3;
 
+    // Current news should feel current, fair, and headline-based.
+    // It does not need to be long-established "classic trivia" yet.
+    if (!keep && isCurrentNewsQuestion) {
+      keep =
+        result.keep === true &&
+        clue >= 4 &&
+        obscurity <= 3;
+    }
+
+    // Non-news pop culture can still be generation-specific if the clue is strong.
     if (!keep && q.category === 'Pop Culture & Current Events') {
       keep =
         result.keep === true &&
@@ -1797,6 +2035,7 @@ async function validateQuestion(q) {
   }
 }
 
+
 function sanitizeForInsert(q) {
   q.topic_key = makeTopicKey(q);
 
@@ -1821,7 +2060,7 @@ function sanitizeForInsert(q) {
   };
 }
 
-async function generateQuestionWithRetries(slot, usedTopics, currentQuestions) {
+async function generateQuestionWithRetries(slot, usedTopics, currentQuestions, dbQuestionCache) {
   const query = buildSearchQuery(slot);
   const freshRequired = sourceRequired(slot);
 
@@ -1859,7 +2098,12 @@ async function generateQuestionWithRetries(slot, usedTopics, currentQuestions) {
     }
 
     if (looksLikeRepeat(q, usedTopics)) {
-      console.log('   Rejected repeat topic: ' + q.answer);
+      console.log('   Rejected repeat topic/question from current run: ' + q.answer);
+      continue;
+    }
+
+    if (await looksLikeDatabaseDuplicate(q, dbQuestionCache)) {
+      console.log('   Rejected database duplicate/near-duplicate: ' + q.answer);
       continue;
     }
 
@@ -1893,7 +2137,7 @@ async function generateQuestionWithRetries(slot, usedTopics, currentQuestions) {
   return null;
 }
 
-async function generateCategoryBatch(category, batchNum, count, pieCategory, usedTopics) {
+async function generateCategoryBatch(category, batchNum, count, pieCategory, usedTopics, dbQuestionCache) {
   const slots = buildSlotsForCategory(category, batchNum, count, pieCategory);
   const questions = [];
 
@@ -1912,7 +2156,7 @@ async function generateCategoryBatch(category, batchNum, count, pieCategory, use
           slot.difficulty
       );
 
-      const q = await generateQuestionWithRetries(slot, usedTopics, questions);
+      const q = await generateQuestionWithRetries(slot, usedTopics, questions, dbQuestionCache);
 
       if (!q) {
         console.log('       No usable question for slot.');
@@ -1920,7 +2164,14 @@ async function generateCategoryBatch(category, batchNum, count, pieCategory, use
       }
 
       questions.push(q);
-      usedTopics.push(q.answer);
+      usedTopics.push({
+        category: q.category,
+        subcategory: q.subcategory,
+        angle: q.angle,
+        question: q.question,
+        answer: q.answer,
+        topic_key: q.topic_key,
+      });
       usedTopics.push(q.topic_key);
 
       await sleep(SEARCH_DELAY_MS);
@@ -1933,15 +2184,16 @@ async function generateCategoryBatch(category, batchNum, count, pieCategory, use
   return questions;
 }
 
-async function generateBatch(batchNum, focusCategories, usedTopics) {
+async function generateBatch(batchNum, focusCategories, usedTopics, dbQuestionCache) {
   const allQuestions = [];
   const categoriesToProcess = focusCategories || CATEGORIES;
   const pieCategory = CATEGORIES[batchNum % CATEGORIES.length];
 
   for (const category of categoriesToProcess) {
     try {
+      // Focused topups now use 10 slots so Sports & Games gets the full planned mix.
       const targetCount = focusCategories
-        ? 8
+        ? 10
         : DISTRIBUTION[category]?.regular || 8;
 
       const generated = await generateCategoryBatch(
@@ -1949,7 +2201,8 @@ async function generateBatch(batchNum, focusCategories, usedTopics) {
         batchNum,
         targetCount,
         pieCategory,
-        usedTopics
+        usedTopics,
+        dbQuestionCache
       );
 
       allQuestions.push(...generated);
@@ -1973,9 +2226,13 @@ async function refillBank(focusCategories) {
 
   const before = await getUnusedCount();
 
-  // Focused top-ups are intentionally smaller so Pop Culture/news searches do not feel stuck.
-  const target = focusCategories ? 40 : REFILL_AMOUNT;
-  const questionsPerBatch = focusCategories ? 8 * focusCategories.length : 58;
+  // Because your topup scripts set process.env.REFILL_AMOUNT after requiring refill.js,
+  // read REFILL_AMOUNT here at runtime instead of at module load.
+  const requestedAmount = getEnvInt('REFILL_AMOUNT', 40);
+  const fullAmount = getEnvInt('REFILL_AMOUNT', 250);
+
+  const target = focusCategories ? requestedAmount : fullAmount;
+  const questionsPerBatch = focusCategories ? 10 * focusCategories.length : 58;
   const batchesNeeded = Math.max(2, Math.ceil(target / questionsPerBatch));
 
   console.log(
@@ -1990,6 +2247,7 @@ async function refillBank(focusCategories) {
 
   let totalAdded = 0;
   const usedTopics = [];
+  const dbQuestionCache = new Map();
 
   try {
     for (let i = 1; i <= batchesNeeded; i++) {
@@ -2003,16 +2261,16 @@ async function refillBank(focusCategories) {
           ' items) ==='
       );
 
-      const questions = await generateBatch(i, focusCategories, usedTopics);
+      const questions = await generateBatch(i, focusCategories, usedTopics, dbQuestionCache);
       const inserted = await insertQuestions(questions);
       const count = parseInt(inserted, 10) || 0;
 
       totalAdded += count;
 
-      questions.forEach(q => {
-        if (q.answer) usedTopics.push(q.answer);
-        if (q.topic_key) usedTopics.push(q.topic_key);
-      });
+      for (const q of questions) {
+        const existing = dbQuestionCache.get(q.category);
+        if (Array.isArray(existing)) existing.push(q);
+      }
 
       console.log(
         '   Batch ' +
@@ -2043,8 +2301,9 @@ async function checkAndRefillIfNeeded() {
   if (isRefilling) return;
 
   const total = await getUnusedCount();
+  const threshold = getEnvInt('LOW_QUESTION_THRESHOLD', 250);
 
-  if (total < THRESHOLD) {
+  if (total < threshold) {
     console.log('Total bank low (' + total + ') — triggering full refill');
     refillBank();
     return;
@@ -2065,10 +2324,14 @@ module.exports = {
   isRefilling: () => isRefilling,
   generateBatch,
 
-  // Exported for quick local tests/debugging.
   buildSlotsForCategory,
   classifyQuestionType,
   answerInQuestion,
   overlapsWithMusicCategory,
   scienceQuestionTooSimple,
+  looksLikeRepeat,
+  looksLikeDatabaseDuplicate,
+  normalizeTextForSimilarity,
+  jaccardSimilarity,
+  isBroadReusableAnswer,
 };
