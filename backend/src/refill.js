@@ -6,12 +6,12 @@ const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 const MODEL = process.env.OPENAI_MODEL || 'gpt-4o';
 const REFILL_AMOUNT = parseInt(process.env.REFILL_AMOUNT || '250', 10);
 const THRESHOLD = parseInt(process.env.LOW_QUESTION_THRESHOLD || '250', 10);
-const MIN_PER_CATEGORY = parseInt(process.env.MIN_PER_CATEGORY || '50', 10);
 const SEARCH_DELAY_MS = parseInt(process.env.SEARCH_DELAY_MS || '450', 10);
 const BATCH_DELAY_MS = parseInt(process.env.BATCH_DELAY_MS || '1200', 10);
 
-// Set to true only if your questions table/db insert supports these columns.
-// The generator uses these internally either way, but by default strips them before insert.
+// Set to true only if your database insert supports these extra columns.
+// By default, this file strips angle/difficulty/precise_era/topic_key before insert
+// so it should remain compatible with your existing db.js.
 const DB_SUPPORTS_EXTENDED_FIELDS = process.env.DB_SUPPORTS_EXTENDED_FIELDS === 'true';
 
 let isRefilling = false;
@@ -28,12 +28,63 @@ const DISTRIBUTION = {
 const DIFFICULTY_CYCLE = ['easy', 'medium', 'medium', 'easy', 'medium', 'pie'];
 
 const ERA_POOLS = {
-  'TV, Movies & Music': ['1980s', '1990s', '2000s', '2010s', '2020s', '1990s', '2000s', '1980s', '2020s', 'timeless'],
-  'Sports & Games': ['1980s', '1990s', '2000s', '2010s', '2020s', 'timeless', '1990s', '2000s', '2010s', '2020s'],
-  'Pop Culture & Current Events': ['2020s', '2020s', '2020s', '2020s', '2010s', '2000s'],
-  'Science & Nature': ['timeless', 'timeless', '2020s', '2010s', '2000s', '1990s'],
-  'Geography': ['timeless', 'timeless', '2020s', '2000s', '1990s'],
-  'History': ['timeless', '1980s', '1990s', '2000s', '2020s', 'classic'],
+  'TV, Movies & Music': [
+    '1980s',
+    '1990s',
+    '2000s',
+    '2010s',
+    '2020s',
+    '1990s',
+    '2000s',
+    '1980s',
+    '2020s',
+    'timeless',
+  ],
+  'Sports & Games': [
+    '1980s',
+    '1990s',
+    '2000s',
+    '2010s',
+    '2020s',
+    'timeless',
+    '1990s',
+    '2000s',
+    '2010s',
+    '2020s',
+  ],
+  'Pop Culture & Current Events': [
+    '2020s',
+    '2020s',
+    '2020s',
+    '2010s',
+    '2000s',
+    '2020s',
+    '2010s',
+    '2020s',
+  ],
+  'Science & Nature': [
+    'timeless',
+    'timeless',
+    '2020s',
+    '2010s',
+    '2000s',
+    '1990s',
+  ],
+  'Geography': [
+    'timeless',
+    'timeless',
+    '2020s',
+    '2000s',
+    '1990s',
+  ],
+  'History': [
+    'timeless',
+    '1980s',
+    '1990s',
+    '2000s',
+    '2020s',
+    'classic',
+  ],
 };
 
 const CATEGORY_SLOT_PLANS = {
@@ -43,11 +94,13 @@ const CATEGORY_SLOT_PLANS = {
     { subcategory: 'board_games', count: 2 },
     { subcategory: 'card_games', count: 1 },
   ],
+
   'TV, Movies & Music': [
     { subcategory: 'tv_show', count: 4 },
     { subcategory: 'movie', count: 3 },
     { subcategory: 'music', count: 3 },
   ],
+
   'Science & Nature': [
     { subcategory: 'animals', count: 2 },
     { subcategory: 'space', count: 1 },
@@ -57,14 +110,18 @@ const CATEGORY_SLOT_PLANS = {
     { subcategory: 'weather', count: 1 },
     { subcategory: 'ocean', count: 1 },
   ],
+
+  // Revised so this category is not too fragile.
+  // Only current_events, politics, and sports_news hard-require fresh web search.
+  // Celebrity, viral, and teen_culture can fall back to stable mainstream pop culture.
   'Pop Culture & Current Events': [
-    { subcategory: 'current_events', count: 3 },
-    { subcategory: 'celebrity', count: 2 },
+    { subcategory: 'celebrity', count: 3 },
     { subcategory: 'teen_culture', count: 2 },
-    { subcategory: 'viral', count: 1 },
-    { subcategory: 'politics', count: 1 },
+    { subcategory: 'viral', count: 2 },
+    { subcategory: 'current_events', count: 2 },
     { subcategory: 'sports_news', count: 1 },
   ],
+
   'Geography': [
     { subcategory: 'cities', count: 2 },
     { subcategory: 'countries', count: 2 },
@@ -73,6 +130,7 @@ const CATEGORY_SLOT_PLANS = {
     { subcategory: 'mountains', count: 1 },
     { subcategory: 'records', count: 1 },
   ],
+
   'History': [
     { subcategory: 'modern', count: 2 },
     { subcategory: 'world_wars', count: 1 },
@@ -137,95 +195,454 @@ const QUESTION_ANGLES = {
       'collectible_card_games',
     ],
   },
+
   'TV, Movies & Music': {
-    tv_show: ['sitcoms', 'dramas', 'streaming_hits', 'classic_tv', 'reality_tv', 'animated_tv', 'tv_catchphrases', 'series_finales', 'spinoffs', 'award_winners'],
-    movie: ['blockbusters', 'franchises', 'directors', 'actors', 'animated_movies', 'movie_music', 'box_office', 'behind_the_scenes', 'awards', 'cult_classics'],
-    music: ['pop_stars', 'rock_bands', 'hip_hop', 'country', 'music_videos', 'albums', 'chart_records', 'awards', 'concerts_and_tours', 'canadian_music'],
+    tv_show: [
+      'sitcoms',
+      'dramas',
+      'streaming_hits',
+      'classic_tv',
+      'reality_tv',
+      'animated_tv',
+      'tv_catchphrases',
+      'series_finales',
+      'spinoffs',
+      'award_winners',
+    ],
+    movie: [
+      'blockbusters',
+      'franchises',
+      'directors',
+      'actors',
+      'animated_movies',
+      'movie_music',
+      'box_office',
+      'behind_the_scenes',
+      'awards',
+      'cult_classics',
+    ],
+    music: [
+      'pop_stars',
+      'rock_bands',
+      'hip_hop',
+      'country',
+      'music_videos',
+      'albums',
+      'chart_records',
+      'awards',
+      'concerts_and_tours',
+      'canadian_music',
+    ],
   },
+
   'Science & Nature': {
-    animals: ['animal_records', 'animal_behavior', 'pets', 'marine_animals', 'birds', 'insects', 'mammals', 'weird_adaptations'],
-    space: ['planets', 'moon_and_mars', 'space_telescopes', 'astronauts', 'space_missions', 'solar_system'],
-    human_body: ['organs', 'senses', 'brain', 'blood', 'bones', 'sleep', 'digestion'],
-    technology: ['inventions', 'everyday_tech', 'internet', 'phones', 'transportation', 'medical_tech'],
-    plants: ['trees', 'flowers', 'crops', 'plant_defenses', 'plant_records', 'carnivorous_plants'],
-    weather: ['storms', 'lightning', 'temperature_records', 'snow_and_ice', 'climate_phenomena'],
-    ocean: ['deep_sea', 'coral_reefs', 'sharks', 'whales', 'ocean_records'],
+    animals: [
+      'animal_records',
+      'animal_behavior',
+      'pets',
+      'marine_animals',
+      'birds',
+      'insects',
+      'mammals',
+      'weird_adaptations',
+    ],
+    space: [
+      'planets',
+      'moon_and_mars',
+      'space_telescopes',
+      'astronauts',
+      'space_missions',
+      'solar_system',
+    ],
+    human_body: [
+      'organs',
+      'senses',
+      'brain',
+      'blood',
+      'bones',
+      'sleep',
+      'digestion',
+    ],
+    technology: [
+      'inventions',
+      'everyday_tech',
+      'internet',
+      'phones',
+      'transportation',
+      'medical_tech',
+    ],
+    plants: [
+      'trees',
+      'flowers',
+      'crops',
+      'plant_defenses',
+      'plant_records',
+      'carnivorous_plants',
+    ],
+    weather: [
+      'storms',
+      'lightning',
+      'temperature_records',
+      'snow_and_ice',
+      'climate_phenomena',
+    ],
+    ocean: [
+      'deep_sea',
+      'coral_reefs',
+      'sharks',
+      'whales',
+      'ocean_records',
+    ],
   },
+
   'Pop Culture & Current Events': {
-    current_events: ['major_news', 'world_events', 'north_american_news', 'environment_news', 'technology_news'],
-    celebrity: ['award_shows', 'celebrity_couples', 'famous_interviews', 'public_feuds', 'career_comebacks'],
-    teen_culture: ['tiktok', 'youtube', 'streamers', 'gen_z_slang', 'viral_products'],
-    viral: ['memes', 'internet_challenges', 'viral_videos', 'social_media_moments'],
-    politics: ['elections', 'leaders', 'court_cases', 'political_firsts'],
-    sports_news: ['headline_sports_moments', 'major_trades', 'championship_headlines', 'olympic_news'],
+    current_events: [
+      'major_news',
+      'world_events',
+      'north_american_news',
+      'environment_news',
+      'technology_news',
+    ],
+    celebrity: [
+      'award_shows',
+      'celebrity_couples',
+      'famous_interviews',
+      'public_feuds',
+      'career_comebacks',
+      'mainstream_pop_stars',
+      'movie_premieres',
+      'celebrity_businesses',
+    ],
+    teen_culture: [
+      'tiktok',
+      'youtube',
+      'streamers',
+      'gen_z_slang',
+      'viral_products',
+      'gaming_crossovers',
+      'social_media_apps',
+      'schoolyard_trends',
+    ],
+    viral: [
+      'memes',
+      'internet_challenges',
+      'viral_videos',
+      'social_media_moments',
+      'internet_phrases',
+      'widely_known_online_moments',
+    ],
+    politics: [
+      'elections',
+      'leaders',
+      'court_cases',
+      'political_firsts',
+    ],
+    sports_news: [
+      'headline_sports_moments',
+      'major_trades',
+      'championship_headlines',
+      'olympic_news',
+    ],
   },
+
   'Geography': {
-    cities: ['landmarks', 'city_nicknames', 'population', 'host_cities', 'urban_features'],
-    countries: ['flags', 'capitals', 'borders', 'name_changes', 'islands', 'country_records'],
-    borders: ['unusual_borders', 'landlocked_countries', 'enclaves', 'border_changes'],
-    rivers: ['famous_rivers', 'river_records', 'river_cities', 'waterfalls'],
-    mountains: ['famous_mountains', 'mountain_records', 'volcanoes', 'mountain_ranges'],
-    records: ['largest_smallest', 'hottest_coldest', 'northernmost_southernmost', 'geographic_extremes'],
+    cities: [
+      'landmarks',
+      'city_nicknames',
+      'population',
+      'host_cities',
+      'urban_features',
+    ],
+    countries: [
+      'flags',
+      'capitals',
+      'borders',
+      'name_changes',
+      'islands',
+      'country_records',
+    ],
+    borders: [
+      'unusual_borders',
+      'landlocked_countries',
+      'enclaves',
+      'border_changes',
+    ],
+    rivers: [
+      'famous_rivers',
+      'river_records',
+      'river_cities',
+      'waterfalls',
+    ],
+    mountains: [
+      'famous_mountains',
+      'mountain_records',
+      'volcanoes',
+      'mountain_ranges',
+    ],
+    records: [
+      'largest_smallest',
+      'hottest_coldest',
+      'northernmost_southernmost',
+      'geographic_extremes',
+    ],
   },
+
   'History': {
-    modern: ['famous_firsts', 'inventions', 'scandals', 'turning_points', 'leaders'],
-    world_wars: ['home_front', 'major_battles', 'wartime_inventions', 'leaders', 'canadian_war_history'],
-    cold_war: ['space_race', 'spies', 'walls_and_borders', 'nuclear_age', 'pop_culture_links'],
-    civil_rights: ['famous_figures', 'landmark_events', 'court_cases', 'protest_movements'],
-    exploration: ['famous_explorers', 'ships', 'maps', 'polar_exploration', 'space_exploration_history'],
-    ancient: ['egypt', 'rome', 'greece', 'ancient_inventions', 'ancient_wonders'],
-    medieval: ['castles', 'plague', 'vikings', 'knights', 'trade_routes'],
+    modern: [
+      'famous_firsts',
+      'inventions',
+      'scandals',
+      'turning_points',
+      'leaders',
+    ],
+    world_wars: [
+      'home_front',
+      'major_battles',
+      'wartime_inventions',
+      'leaders',
+      'canadian_war_history',
+    ],
+    cold_war: [
+      'space_race',
+      'spies',
+      'walls_and_borders',
+      'nuclear_age',
+      'pop_culture_links',
+    ],
+    civil_rights: [
+      'famous_figures',
+      'landmark_events',
+      'court_cases',
+      'protest_movements',
+    ],
+    exploration: [
+      'famous_explorers',
+      'ships',
+      'maps',
+      'polar_exploration',
+      'space_exploration_history',
+    ],
+    ancient: [
+      'egypt',
+      'rome',
+      'greece',
+      'ancient_inventions',
+      'ancient_wonders',
+    ],
+    medieval: [
+      'castles',
+      'plague',
+      'vikings',
+      'knights',
+      'trade_routes',
+    ],
   },
 };
 
 const ANGLE_SEARCH_GUIDANCE = {
-  players_and_legends: 'famous athletes, nicknames, iconic career moments, recognizable stars only; avoid obscure stat-only trivia',
-  teams_and_rivalries: 'famous teams, rivalries, dynasties, playoff matchups, expansion teams, relocation stories',
-  stadiums_and_arenas: 'famous stadiums and arenas, unusual features, naming history, home teams, iconic venues',
-  broadcasters_and_media: 'famous sports broadcasters, theme songs, TV coverage, commentary catchphrases, sports media moments',
-  rules_and_penalties: 'sports rules, penalties, scoring systems, rule changes, unusual rules casual fans can understand',
-  trophies_and_championships: 'major trophies and championship traditions, Stanley Cup, Super Bowl, World Series, NBA Finals, Grey Cup',
-  logos_uniforms_and_mascots: 'team logos, mascots, jersey changes, colours, uniform traditions, famous sports branding',
-  coaches_and_managers: 'famous coaches and managers, championship coaches, recognizable leadership stories',
-  olympic_moments: 'Olympic host cities, mascots, ceremonies, records, famous medal moments, Canadian Olympic stories',
-  sports_business_and_expansion: 'team relocations, expansion teams, league mergers, drafts, trades, salary caps, franchise stories',
-  famous_games_and_moments: 'iconic games, buzzer beaters, miracle comebacks, famous goals, recognizable moments',
-  canadian_sports_culture: 'Hockey Night in Canada, Grey Cup, Canadian athletes, Canadian teams, curling, Olympics, sports traditions',
+  players_and_legends:
+    'famous athletes, nicknames, iconic career moments, recognizable stars only; avoid obscure stat-only trivia',
+  teams_and_rivalries:
+    'famous teams, rivalries, dynasties, playoff matchups, expansion teams, relocation stories',
+  stadiums_and_arenas:
+    'famous stadiums and arenas, unusual features, naming history, home teams, iconic venues',
+  broadcasters_and_media:
+    'famous sports broadcasters, theme songs, TV coverage, commentary catchphrases, sports media moments',
+  rules_and_penalties:
+    'sports rules, penalties, scoring systems, rule changes, unusual rules casual fans can understand',
+  trophies_and_championships:
+    'major trophies and championship traditions, Stanley Cup, Super Bowl, World Series, NBA Finals, Grey Cup',
+  logos_uniforms_and_mascots:
+    'team logos, mascots, jersey changes, colours, uniform traditions, famous sports branding',
+  coaches_and_managers:
+    'famous coaches and managers, championship coaches, recognizable leadership stories',
+  olympic_moments:
+    'Olympic host cities, mascots, ceremonies, records, famous medal moments, Canadian Olympic stories',
+  sports_business_and_expansion:
+    'team relocations, expansion teams, league mergers, drafts, trades, salary caps, franchise stories',
+  famous_games_and_moments:
+    'iconic games, buzzer beaters, miracle comebacks, famous goals, recognizable moments',
+  canadian_sports_culture:
+    'Hockey Night in Canada, Grey Cup, Canadian athletes, Canadian teams, curling, Olympics, sports traditions',
 
-  console_history: 'Nintendo, Sega, PlayStation, Xbox, console launches, hardware features, console wars, sales milestones',
-  iconic_characters: 'Mario, Link, Sonic, Pikachu, Master Chief, Lara Croft, recognizable game characters and origins',
-  gameplay_mechanics: 'power-ups, open worlds, save files, motion controls, battle royale, platforming, game mechanics',
-  franchises: 'Zelda, Mario Kart, Pokémon, Call of Duty, GTA, Minecraft, Fortnite, Final Fantasy, Halo',
-  developers_and_studios: 'Nintendo, Sega, Sony, Microsoft, Rockstar, Blizzard, Valve, EA, Ubisoft, studio histories',
-  arcade_history: 'Pac-Man, Donkey Kong, Space Invaders, Street Fighter, Mortal Kombat, arcade cabinets and high scores',
-  handheld_gaming: 'Game Boy, Nintendo DS, PSP, Switch, handheld console history and famous portable games',
-  pc_gaming: 'Steam, The Sims, Doom, World of Warcraft, Minecraft, mods, PC gaming milestones',
-  esports: 'League of Legends, Dota 2, Counter-Strike, Fortnite, esports tournaments, prize pools, famous events',
-  mobile_games: 'Angry Birds, Candy Crush, Pokémon Go, mobile gaming records, app-store gaming trends',
-  gaming_music_and_sound: 'famous video game music, sound effects, composers, theme songs, iconic gaming audio',
-  gaming_cultural_impact: 'video games in movies, TV, culture, controversies, ratings, moral panics, classroom or family relevance',
+  console_history:
+    'Nintendo, Sega, PlayStation, Xbox, console launches, hardware features, console wars, sales milestones',
+  iconic_characters:
+    'Mario, Link, Sonic, Pikachu, Master Chief, Lara Croft, recognizable game characters and origins',
+  gameplay_mechanics:
+    'power-ups, open worlds, save files, motion controls, battle royale, platforming, game mechanics',
+  franchises:
+    'Zelda, Mario Kart, Pokémon, Call of Duty, GTA, Minecraft, Fortnite, Final Fantasy, Halo',
+  developers_and_studios:
+    'Nintendo, Sega, Sony, Microsoft, Rockstar, Blizzard, Valve, EA, Ubisoft, studio histories',
+  arcade_history:
+    'Pac-Man, Donkey Kong, Space Invaders, Street Fighter, Mortal Kombat, arcade cabinets and high scores',
+  handheld_gaming:
+    'Game Boy, Nintendo DS, PSP, Switch, handheld console history and famous portable games',
+  pc_gaming:
+    'Steam, The Sims, Doom, World of Warcraft, Minecraft, mods, PC gaming milestones',
+  esports:
+    'League of Legends, Dota 2, Counter-Strike, Fortnite, esports tournaments, prize pools, famous events',
+  mobile_games:
+    'Angry Birds, Candy Crush, Pokémon Go, mobile gaming records, app-store gaming trends',
+  gaming_music_and_sound:
+    'famous video game music, sound effects, composers, theme songs, iconic gaming audio',
+  gaming_cultural_impact:
+    'video games in movies, TV, culture, controversies, ratings, moral panics, classroom or family relevance',
 
-  classic_board_games: 'Monopoly, Scrabble, Clue, Risk, Battleship, Trivial Pursuit, chess, checkers, recognizable classics',
-  modern_board_games: 'Catan, Ticket to Ride, Codenames, Pandemic, Carcassonne, modern tabletop games families may know',
-  rules_and_mechanics: 'dice, cards, tiles, boards, trading, bluffing, cooperative games, simple rule facts',
-  game_inventors: 'inventors and origin stories of famous games, but only games most families know',
-  party_games: 'Pictionary, Taboo, Charades, Twister, party game history and rules',
-  strategy_games: 'chess, Risk, Catan, Stratego, Go, strategy game concepts and famous facts',
-  word_games: 'Scrabble, Boggle, crosswords, Wordle, word-game rules, tiles, scoring, origin stories',
-  trivia_games: 'Trivial Pursuit, Jeopardy, quiz shows, trivia formats, famous trivia games',
-  family_games: 'Uno, Sorry!, Trouble, Life, Guess Who?, Connect Four, family game rules and origins',
-  game_components: 'dice, meeples, tokens, spinners, boards, cards, timers, game pieces and their origins',
+  classic_board_games:
+    'Monopoly, Scrabble, Clue, Risk, Battleship, Trivial Pursuit, chess, checkers, recognizable classics',
+  modern_board_games:
+    'Catan, Ticket to Ride, Codenames, Pandemic, Carcassonne, modern tabletop games families may know',
+  rules_and_mechanics:
+    'dice, cards, tiles, boards, trading, bluffing, cooperative games, simple rule facts',
+  game_inventors:
+    'inventors and origin stories of famous games, but only games most families know',
+  party_games:
+    'Pictionary, Taboo, Charades, Twister, party game history and rules',
+  strategy_games:
+    'chess, Risk, Catan, Stratego, Go, strategy game concepts and famous facts',
+  word_games:
+    'Scrabble, Boggle, crosswords, Wordle, word-game rules, tiles, scoring, origin stories',
+  trivia_games:
+    'Trivial Pursuit, Jeopardy, quiz shows, trivia formats, famous trivia games',
+  family_games:
+    'Uno, Sorry!, Trouble, Life, Guess Who?, Connect Four, family game rules and origins',
+  game_components:
+    'dice, meeples, tokens, spinners, boards, cards, timers, game pieces and their origins',
 
-  default: 'recognizable North American family trivia topic with an interesting clue, not obscure specialist material',
+  award_shows:
+    'Grammy Awards, Oscars, Emmys, VMAs, major award show moments and recognizable winners',
+  celebrity_couples:
+    'widely known celebrity couples and breakups from mainstream pop culture',
+  famous_interviews:
+    'famous celebrity interviews, talk show moments, Oprah, late-night TV, widely recognized media moments',
+  public_feuds:
+    'mainstream celebrity feuds, music feuds, public pop culture conflicts known to families',
+  career_comebacks:
+    'mainstream celebrity comebacks, revived careers, comeback albums, comeback roles',
+  mainstream_pop_stars:
+    'Taylor Swift, Beyoncé, Drake, Rihanna, Billie Eilish, Olivia Rodrigo, The Weeknd, major pop stars',
+  movie_premieres:
+    'Barbie, Oppenheimer, Marvel movies, Disney movies, major movie premieres and press-tour moments',
+  celebrity_businesses:
+    'celebrity brands, beauty lines, fashion lines, restaurants, tequila brands, mainstream celebrity businesses',
+
+  tiktok:
+    'widely known TikTok trends, dances, creators, sounds, and TikTok culture that reached mainstream awareness',
+  youtube:
+    'YouTube milestones, famous creators, MrBeast, viral channels, subscriber records, mainstream YouTube culture',
+  streamers:
+    'Twitch streamers, gaming streamers, livestream records, widely known streaming personalities',
+  gen_z_slang:
+    'mainstream Gen Z slang words and phrases understood or discussed by families',
+  viral_products:
+    'viral products, Stanley cups, Prime drink, Squishmallows, fidget spinners, mainstream trend products',
+  gaming_crossovers:
+    'Fortnite concerts, Minecraft, Roblox, gaming crossovers with music, movies, and sports',
+  social_media_apps:
+    'TikTok, Instagram, Snapchat, BeReal, Twitter/X, Facebook, social media app features and changes',
+  schoolyard_trends:
+    'mainstream school trends, toys, apps, games, and teen pop culture from the 2010s and 2020s',
+
+  memes:
+    'widely known memes, internet phrases, meme images, mainstream online jokes',
+  internet_challenges:
+    'widely known internet challenges and viral social media challenges',
+  viral_videos:
+    'viral videos that reached mainstream family awareness, YouTube and TikTok viral clips',
+  social_media_moments:
+    'major social media moments, viral posts, platform changes, mainstream online events',
+  internet_phrases:
+    'internet catchphrases, meme phrases, viral expressions, mainstream online language',
+  widely_known_online_moments:
+    'widely known online moments from TikTok, YouTube, Instagram, and Twitter/X',
+
+  major_news:
+    'major news stories from Canada, the United States, and the world from 2025 and 2026',
+  world_events:
+    'major world events from 2025 and 2026 that North American families likely heard about',
+  north_american_news:
+    'major Canada and United States news stories from 2025 and 2026',
+  environment_news:
+    'major environmental news, climate events, wildfires, storms, conservation stories from 2025 and 2026',
+  technology_news:
+    'major technology news from 2025 and 2026, AI, phones, space, major tech companies',
+  headline_sports_moments:
+    'major sports headlines from 2025 and 2026 in NHL NBA NFL MLB Olympics tennis soccer',
+  major_trades:
+    'major sports trades and signings from 2025 and 2026 in North American sports',
+  championship_headlines:
+    'championship winners and major finals from 2025 and 2026',
+  olympic_news:
+    'Olympic news, host cities, medal moments, and major Olympic headlines',
+
+  default:
+    'recognizable North American family trivia topic with an interesting clue, not obscure specialist material',
 };
 
 const VALID_SUBCATEGORIES = {
-  'Sports & Games': ['nhl', 'nba', 'nfl', 'mlb', 'golf', 'olympics', 'tennis', 'soccer', 'sports', 'video_games', 'board_games', 'card_games', 'esports'],
-  'TV, Movies & Music': ['tv_show', 'movie', 'music', 'streaming', 'reality_tv'],
-  'Science & Nature': ['space', 'animals', 'human_body', 'technology', 'plants', 'weather', 'chemistry', 'physics', 'scientists', 'food_science', 'ocean'],
-  'Pop Culture & Current Events': ['current_events', 'celebrity', 'teen_culture', 'viral', 'politics', 'sports_news'],
-  'Geography': ['capitals', 'countries', 'rivers', 'mountains', 'records', 'cities', 'borders'],
-  'History': ['ancient', 'medieval', 'world_wars', 'cold_war', 'civil_rights', 'modern', 'exploration'],
+  'Sports & Games': [
+    'nhl',
+    'nba',
+    'nfl',
+    'mlb',
+    'golf',
+    'olympics',
+    'tennis',
+    'soccer',
+    'sports',
+    'video_games',
+    'board_games',
+    'card_games',
+    'esports',
+  ],
+  'TV, Movies & Music': [
+    'tv_show',
+    'movie',
+    'music',
+    'streaming',
+    'reality_tv',
+  ],
+  'Science & Nature': [
+    'space',
+    'animals',
+    'human_body',
+    'technology',
+    'plants',
+    'weather',
+    'chemistry',
+    'physics',
+    'scientists',
+    'food_science',
+    'ocean',
+  ],
+  'Pop Culture & Current Events': [
+    'current_events',
+    'celebrity',
+    'teen_culture',
+    'viral',
+    'politics',
+    'sports_news',
+  ],
+  'Geography': [
+    'capitals',
+    'countries',
+    'rivers',
+    'mountains',
+    'records',
+    'cities',
+    'borders',
+  ],
+  'History': [
+    'ancient',
+    'medieval',
+    'world_wars',
+    'cold_war',
+    'civil_rights',
+    'modern',
+    'exploration',
+  ],
 };
 
 const QUESTION_SYSTEM_PROMPT = [
@@ -270,6 +687,12 @@ const QUESTION_SYSTEM_PROMPT = [
   'Video game questions must rotate across consoles, characters, gameplay mechanics, developers/studios, franchises, music/sound, arcade history, handheld systems, PC gaming, esports, mobile games, and cultural impact.',
   'Board/card game questions must rotate across classic games, modern tabletop games, party games, word games, strategy games, card games, trading card games, pieces/components, rules/scoring, inventors, and origin stories.',
   '',
+  '=== POP CULTURE & CURRENT EVENTS RULES ===',
+  'For current_events, politics, and sports_news, use fresh source material only.',
+  'For celebrity, teen_culture, and viral questions, use mainstream stable topics if fresh search is unavailable.',
+  'Do not claim a question is about the newest, latest, or current trend unless source material clearly supports it.',
+  'Teen-culture questions may be generation-specific, but the clue must include enough context for parents or grandparents to make a reasonable guess.',
+  '',
   '=== OUTPUT ===',
   'Respond ONLY with valid JSON, no markdown, no code blocks.',
   'Use this shape exactly:',
@@ -287,15 +710,36 @@ function choiceFromCycle(list, index) {
 
 function normalizeCategory(cat) {
   if (!cat) return null;
+
   const c = String(cat).trim();
   if (CATEGORIES.includes(c)) return c;
+
   const lower = c.toLowerCase();
-  if (lower.includes('tv') || lower.includes('movie') || lower.includes('music') || lower.includes('entertainment')) return 'TV, Movies & Music';
-  if (lower.includes('pop culture') || lower.includes('current event') || lower.includes('trend')) return 'Pop Culture & Current Events';
+
+  if (
+    lower.includes('tv') ||
+    lower.includes('movie') ||
+    lower.includes('music') ||
+    lower.includes('entertainment')
+  ) {
+    return 'TV, Movies & Music';
+  }
+
+  if (
+    lower.includes('pop culture') ||
+    lower.includes('current event') ||
+    lower.includes('trend') ||
+    lower.includes('celebrity') ||
+    lower.includes('viral')
+  ) {
+    return 'Pop Culture & Current Events';
+  }
+
   if (lower.includes('geograph')) return 'Geography';
   if (lower.includes('histor')) return 'History';
   if (lower.includes('science') || lower.includes('nature')) return 'Science & Nature';
   if (lower.includes('sport') || lower.includes('game') || lower.includes('video')) return 'Sports & Games';
+
   return null;
 }
 
@@ -321,6 +765,15 @@ function normalizeSubcategory(category, subcategory) {
     if (safe.includes('film')) return 'movie';
   }
 
+  if (category === 'Pop Culture & Current Events') {
+    if (safe.includes('celebrity')) return 'celebrity';
+    if (safe.includes('teen')) return 'teen_culture';
+    if (safe.includes('viral') || safe.includes('meme')) return 'viral';
+    if (safe.includes('sport')) return 'sports_news';
+    if (safe.includes('politic') || safe.includes('election')) return 'politics';
+    if (safe.includes('news') || safe.includes('current')) return 'current_events';
+  }
+
   return allowed[0] || safe || 'misc';
 }
 
@@ -335,32 +788,104 @@ function legacyEra(era) {
 
 function answerInQuestion(question, answer) {
   if (!question || !answer) return false;
+
   const q = String(question).toLowerCase();
-  const stopWords = new Set(['the', 'a', 'an', 'of', 'in', 'on', 'at', 'to', 'for', 'is', 'was', 'are', 'were', 'and', 'or', 'but', 'it', 'its', 'this', 'that', 'these', 'those', 'by', 'with', 'from', 'as', 'be', 'been', 'has', 'had', 'have', 'which', 'who', 'what', 'where', 'when', 'how', 'not', 'no', 'do', 'did', 'does']);
+
+  const stopWords = new Set([
+    'the',
+    'a',
+    'an',
+    'of',
+    'in',
+    'on',
+    'at',
+    'to',
+    'for',
+    'is',
+    'was',
+    'are',
+    'were',
+    'and',
+    'or',
+    'but',
+    'it',
+    'its',
+    'this',
+    'that',
+    'these',
+    'those',
+    'by',
+    'with',
+    'from',
+    'as',
+    'be',
+    'been',
+    'has',
+    'had',
+    'have',
+    'which',
+    'who',
+    'what',
+    'where',
+    'when',
+    'how',
+    'not',
+    'no',
+    'do',
+    'did',
+    'does',
+  ]);
+
   const answerWords = String(answer)
     .toLowerCase()
     .replace(/[^a-z0-9\s]/g, ' ')
     .split(/\s+/)
     .filter(w => w.length > 3 && !stopWords.has(w));
+
   return answerWords.some(word => q.includes(word));
 }
 
 function hasBannedEnding(question) {
   const q = String(question || '').trim().toLowerCase();
+
   return /(?:what is it\?|who is it\?|what is this\?|who is this\?|who is he\?|who is she\?|what are they\?|name this)/.test(q);
 }
 
 function classifyQuestionType(question) {
   const q = String(question || '').toLowerCase();
 
-  if (/\b(player|athlete|scored|goals|points|home runs|touchdowns|mvp|hart|heisman|batting|yards|assists|rebounds|wins above replacement)\b/.test(q)) return 'player_stat';
-  if (/\b(stadium|arena|field|ballpark|centre|center|dome|garden|rink|court|course)\b/.test(q)) return 'venue';
-  if (/\b(broadcaster|commentator|announcer|called games|voice of|play-by-play|hockey night|theme song)\b/.test(q)) return 'media';
-  if (/\b(rule|penalty|offside|icing|foul|yard line|periods|innings|downs|power play|red card)\b/.test(q)) return 'rules';
-  if (/\b(mascot|logo|jersey|uniform|colours|colors|helmet|nickname)\b/.test(q)) return 'branding';
-  if (/\b(trophy|cup|championship|finals|super bowl|world series|stanley cup|grey cup|olympic medal)\b/.test(q)) return 'championships';
-  if (/\b(console|nintendo|playstation|xbox|sega|game boy|switch)\b/.test(q)) return 'video_console';
-  if (/\b(board|dice|tiles|tokens|cards|meeples|scrabble|monopoly|catan|clue|risk)\b/.test(q)) return 'tabletop';
+  if (/\b(player|athlete|scored|goals|points|home runs|touchdowns|mvp|hart|heisman|batting|yards|assists|rebounds|wins above replacement)\b/.test(q)) {
+    return 'player_stat';
+  }
+
+  if (/\b(stadium|arena|field|ballpark|centre|center|dome|garden|rink|court|course)\b/.test(q)) {
+    return 'venue';
+  }
+
+  if (/\b(broadcaster|commentator|announcer|called games|voice of|play-by-play|hockey night|theme song)\b/.test(q)) {
+    return 'media';
+  }
+
+  if (/\b(rule|penalty|offside|icing|foul|yard line|periods|innings|downs|power play|red card)\b/.test(q)) {
+    return 'rules';
+  }
+
+  if (/\b(mascot|logo|jersey|uniform|colours|colors|helmet|nickname)\b/.test(q)) {
+    return 'branding';
+  }
+
+  if (/\b(trophy|cup|championship|finals|super bowl|world series|stanley cup|grey cup|olympic medal)\b/.test(q)) {
+    return 'championships';
+  }
+
+  if (/\b(console|nintendo|playstation|xbox|sega|game boy|switch)\b/.test(q)) {
+    return 'video_console';
+  }
+
+  if (/\b(board|dice|tiles|tokens|cards|meeples|scrabble|monopoly|catan|clue|risk)\b/.test(q)) {
+    return 'tabletop';
+  }
+
   return 'other';
 }
 
@@ -378,6 +903,7 @@ function tooManySimilarQuestions(currentQuestions, newQuestion) {
   if (sameType >= 3) return true;
   if (sameAngle >= 1) return true;
   if (subcategory === 'sports' && sameSubcategory >= 4) return true;
+
   return false;
 }
 
@@ -392,8 +918,10 @@ function makeTopicKey(q) {
 
 function looksLikeRepeat(q, usedTopics) {
   if (!q || !q.answer) return false;
+
   const answer = String(q.answer).toLowerCase().trim();
   const key = makeTopicKey(q);
+
   return usedTopics.some(t => {
     const s = String(t).toLowerCase();
     return s === answer || s === key || (answer.length > 4 && s.includes(answer));
@@ -429,11 +957,12 @@ function buildSlotsForCategory(category, batchNum, desiredCount, pieCategory) {
     cursor += block.count + 3;
   }
 
-  // If the plan creates fewer slots than requested, continue cycling through the same structure.
   let extensionIndex = 0;
+
   while (slots.length < desiredCount) {
     const block = choiceFromCycle(plan, cursor + extensionIndex);
     const angleList = (QUESTION_ANGLES[category] && QUESTION_ANGLES[category][block.subcategory]) || ['default'];
+
     slots.push({
       category,
       subcategory: block.subcategory,
@@ -442,6 +971,7 @@ function buildSlotsForCategory(category, batchNum, desiredCount, pieCategory) {
       difficulty: choiceFromCycle(DIFFICULTY_CYCLE, cursor + extensionIndex),
       is_pie: category === pieCategory && slots.length === 0,
     });
+
     extensionIndex++;
   }
 
@@ -449,19 +979,86 @@ function buildSlotsForCategory(category, batchNum, desiredCount, pieCategory) {
 }
 
 function sourceRequired(slot) {
+  // Important revision:
+  // Only hard-require fresh search for genuinely time-sensitive news.
+  // Celebrity, teen culture, and viral questions are allowed to fall back
+  // to stable mainstream pop culture if search fails.
   return (
-    slot.category === 'Pop Culture & Current Events' ||
-    slot.era === '2020s' ||
     slot.subcategory === 'current_events' ||
+    slot.subcategory === 'politics' ||
+    slot.subcategory === 'sports_news' ||
+    slot.angle === 'major_news' ||
+    slot.angle === 'world_events' ||
+    slot.angle === 'north_american_news' ||
+    slot.angle === 'environment_news' ||
     slot.angle === 'technology_news' ||
-    slot.angle === 'major_news'
+    slot.angle === 'elections' ||
+    slot.angle === 'leaders' ||
+    slot.angle === 'court_cases' ||
+    slot.angle === 'headline_sports_moments' ||
+    slot.angle === 'major_trades' ||
+    slot.angle === 'championship_headlines' ||
+    slot.angle === 'olympic_news'
   );
 }
 
 function buildSearchQuery(slot) {
   const guidance = ANGLE_SEARCH_GUIDANCE[slot.angle] || ANGLE_SEARCH_GUIDANCE.default;
   const eraText = slot.era === 'timeless' ? '' : slot.era;
+
+  if (slot.category === 'Pop Culture & Current Events') {
+    if (slot.subcategory === 'current_events') {
+      return [
+        'major news stories Canada United States world recent 2025 2026',
+        guidance,
+        'accessible trivia recognizable names events',
+      ].join(' ');
+    }
+
+    if (slot.subcategory === 'politics') {
+      return [
+        'major political news Canada United States world recent 2025 2026',
+        guidance,
+        'accessible family trivia recognizable leaders elections court cases',
+      ].join(' ');
+    }
+
+    if (slot.subcategory === 'sports_news') {
+      return [
+        'major sports headlines recent 2025 2026 NHL NBA NFL MLB Olympics',
+        guidance,
+        'recognizable sports news trivia',
+      ].join(' ');
+    }
+
+    if (slot.subcategory === 'celebrity') {
+      return [
+        'mainstream celebrity pop culture moments 2000s 2010s 2020s',
+        'Taylor Swift Beyoncé Drake Rihanna Barbie Oppenheimer Marvel award shows',
+        guidance,
+        'recognizable family trivia',
+      ].join(' ');
+    }
+
+    if (slot.subcategory === 'teen_culture') {
+      return [
+        'mainstream teen culture 2010s 2020s TikTok YouTube Minecraft Fortnite Roblox social media',
+        guidance,
+        'recognizable family trivia',
+      ].join(' ');
+    }
+
+    if (slot.subcategory === 'viral') {
+      return [
+        'mainstream viral internet moments memes 2010s 2020s TikTok YouTube widely recognized',
+        guidance,
+        'accessible family trivia',
+      ].join(' ');
+    }
+  }
+
   const currentText = sourceRequired(slot) ? 'latest recent 2025 2026' : '';
+
   return [
     eraText,
     currentText,
@@ -470,8 +1067,40 @@ function buildSearchQuery(slot) {
   ].filter(Boolean).join(' ');
 }
 
+function stablePopCultureFallback(slot) {
+  const topicHints = {
+    celebrity: [
+      'Taylor Swift, Beyoncé, Drake, Rihanna, Billie Eilish, Olivia Rodrigo, The Weeknd, Ryan Reynolds, Dwayne Johnson, Zendaya',
+      'Barbie, Oppenheimer, Marvel movies, Star Wars, Disney, Netflix, award shows, major tours, celebrity brands',
+    ].join('\n'),
+    teen_culture: [
+      'TikTok, YouTube, Minecraft, Fortnite, Roblox, Pokémon, Nintendo Switch, Snapchat, Instagram, MrBeast',
+      'Stanley cups, Squishmallows, Prime drink, Wordle, social media apps, streaming culture',
+    ].join('\n'),
+    viral: [
+      'widely known memes, viral dances, YouTube videos, TikTok trends, internet catchphrases, social media moments',
+      'Choose only trends that reached mainstream awareness, not tiny niche memes.',
+    ].join('\n'),
+  };
+
+  return [
+    'Use only stable, widely recognized pop-culture knowledge.',
+    'Do not claim anything is the latest, newest, current, or recent.',
+    'Choose mainstream answers from the 2000s, 2010s, or 2020s that many North American families would recognize.',
+    'The answer should be recognizable to at least one generation, and the clue should help the others guess.',
+    '',
+    'Topic area:',
+    topicHints[slot.subcategory] || 'mainstream pop culture, movies, music, internet culture, and entertainment.',
+  ].join('\n');
+}
+
 async function searchWeb(query, requireFresh = false) {
-  const today = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+  const today = new Date().toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+  });
+
   const searchTools = [
     [{ type: 'web_search_preview' }],
     [{ type: 'web_search_preview_2025_03_11' }],
@@ -483,19 +1112,22 @@ async function searchWeb(query, requireFresh = false) {
         model: MODEL,
         max_tokens: 900,
         tools,
-        messages: [{
-          role: 'user',
-          content: [
-            'Today is ' + today + '.',
-            'Search for: ' + query,
-            '',
-            'Find 4-6 trivia-worthy facts with recognizable answers and helpful context.',
-            'Prioritize facts that are accessible to a Canadian/North American family.',
-            'Avoid obscure specialist facts and minor names.',
-            'For recent events, include the year and avoid stale information.',
-          ].join('\n'),
-        }],
+        messages: [
+          {
+            role: 'user',
+            content: [
+              'Today is ' + today + '.',
+              'Search for: ' + query,
+              '',
+              'Find 4-6 trivia-worthy facts with recognizable answers and helpful context.',
+              'Prioritize facts that are accessible to a Canadian/North American family.',
+              'Avoid obscure specialist facts and minor names.',
+              'For recent events, include the year and avoid stale information.',
+            ].join('\n'),
+          },
+        ],
       });
+
       const content = response.choices[0]?.message?.content || '';
       if (content.trim().length > 80) return content;
     } catch (e) {
@@ -504,7 +1136,7 @@ async function searchWeb(query, requireFresh = false) {
   }
 
   if (requireFresh) {
-    console.log('   Fresh search failed; skipping non-search fallback for current/recent slot.');
+    console.log('   Fresh search failed; skipping non-search fallback for current/recent news slot.');
     return '';
   }
 
@@ -512,17 +1144,21 @@ async function searchWeb(query, requireFresh = false) {
     const response = await client.chat.completions.create({
       model: MODEL,
       max_tokens: 700,
-      messages: [{
-        role: 'user',
-        content: [
-          'Using your general knowledge, list 4-6 accessible trivia facts about:',
-          query,
-          '',
-          'The answer should be widely recognizable. The clue can be interesting but not obscure.',
-          'Avoid exact dates, niche records, specialist facts, and minor names.',
-        ].join('\n'),
-      }],
+      messages: [
+        {
+          role: 'user',
+          content: [
+            'Using your general knowledge, list 4-6 accessible trivia facts about:',
+            query,
+            '',
+            'The answer should be widely recognizable. The clue can be interesting but not obscure.',
+            'Avoid exact dates, niche records, specialist facts, and minor names.',
+            'Do not claim anything is current, latest, newest, or recent.',
+          ].join('\n'),
+        },
+      ],
     });
+
     return response.choices[0]?.message?.content || '';
   } catch (e) {
     console.log('   Search fallback failed: ' + e.message);
@@ -551,6 +1187,8 @@ async function generateQuestionForSlot(slot, content, usedTopics) {
     '- Respect the exact subcategory, angle, era, and difficulty from the slot.',
     '- For 1980s, 1990s, and 2000s slots, choose content genuinely associated with that decade.',
     '- For timeless slots, choose broadly familiar facts not tied to one news cycle.',
+    '- For current_events, politics, and sports_news, use only the source material provided.',
+    '- For celebrity, teen_culture, and viral questions, do not claim something is latest/current unless source material says so.',
     '- Maximum answer length: 5 words.',
     '- The answer words must not appear in the question text.',
     '- No banned endings such as "who is this?" or "what is it?".',
@@ -570,6 +1208,7 @@ async function generateQuestionForSlot(slot, content, usedTopics) {
   });
 
   const obj = JSON.parse(response.choices[0]?.message?.content || '{}');
+
   const category = normalizeCategory(obj.category || slot.category) || slot.category;
   const subcategory = normalizeSubcategory(category, obj.subcategory || slot.subcategory);
 
@@ -580,7 +1219,8 @@ async function generateQuestionForSlot(slot, content, usedTopics) {
     is_pie: slot.is_pie === true || obj.is_pie === true || slot.difficulty === 'pie',
     canadian: obj.canadian === true,
     subcategory,
-    // Internal/optional metadata:
+
+    // Internal/optional metadata.
     angle: String(obj.angle || slot.angle).trim(),
     precise_era: String(obj.era || slot.era).trim(),
     era: legacyEra(String(obj.era || slot.era).trim()),
@@ -612,9 +1252,11 @@ async function rewriteQuestion(q) {
 
     const result = JSON.parse(response.choices[0]?.message?.content || '{}');
     const rewritten = String(result.question || '').trim();
+
     if (rewritten && !answerInQuestion(rewritten, q.answer) && !hasBannedEnding(rewritten)) {
       return { ...q, question: rewritten };
     }
+
     return null;
   } catch (e) {
     return null;
@@ -635,6 +1277,7 @@ async function validateQuestion(q) {
     '',
     'Reject questions that are too obscure, too stat-heavy, too specialist, misleading, ambiguous, or only answerable by a superfan.',
     'For pie questions, allow slightly harder clues, but still require a recognizable answer.',
+    'For Pop Culture & Current Events, teen-culture answers may be generation-specific, but the clue must be helpful.',
     '',
     'Return ONLY valid JSON:',
     '{ "keep": true, "recognizability": 4, "clue_helpfulness": 4, "obscurity_risk": 2, "diversity_value": 4, "reason": "..." }',
@@ -649,18 +1292,31 @@ async function validateQuestion(q) {
     });
 
     const result = JSON.parse(response.choices[0]?.message?.content || '{}');
+
     const recognizability = Number(result.recognizability || 0);
     const clue = Number(result.clue_helpfulness || 0);
     const obscurity = Number(result.obscurity_risk || 5);
-    const keep = result.keep === true && recognizability >= 3 && clue >= 3 && obscurity <= 3;
+
+    let keep = result.keep === true && recognizability >= 3 && clue >= 3 && obscurity <= 3;
+
+    // Pop culture can be generation-specific as long as the clue is strong.
+    if (!keep && q.category === 'Pop Culture & Current Events') {
+      keep = result.keep === true && recognizability >= 2 && clue >= 4 && obscurity <= 3;
+    }
 
     if (!keep) {
       console.log('   Validator rejected: ' + q.answer + ' — ' + (result.reason || 'no reason'));
     }
+
     return keep;
   } catch (e) {
     // If validator fails, keep only structurally safe questions rather than dropping the whole batch.
-    return Boolean(q.question && q.answer && !answerInQuestion(q.question, q.answer) && !hasBannedEnding(q.question));
+    return Boolean(
+      q.question &&
+      q.answer &&
+      !answerInQuestion(q.question, q.answer) &&
+      !hasBannedEnding(q.question)
+    );
   }
 }
 
@@ -691,9 +1347,21 @@ function sanitizeForInsert(q) {
 async function generateQuestionWithRetries(slot, usedTopics, currentQuestions) {
   const query = buildSearchQuery(slot);
   const freshRequired = sourceRequired(slot);
-  const content = await searchWeb(query, freshRequired);
+  let content = await searchWeb(query, freshRequired);
 
-  if (!content && freshRequired) return null;
+  if (!content && freshRequired) {
+    console.log(
+      '   Fresh source required but search failed for: ' +
+      slot.subcategory +
+      ' / ' +
+      slot.angle
+    );
+    return null;
+  }
+
+  if (!content && slot.category === 'Pop Culture & Current Events') {
+    content = stablePopCultureFallback(slot);
+  }
 
   for (let attempt = 1; attempt <= 2; attempt++) {
     let q = await generateQuestionForSlot(slot, content, usedTopics);
@@ -734,8 +1402,19 @@ async function generateCategoryBatch(category, batchNum, count, pieCategory, use
 
   for (const slot of slots) {
     try {
-      console.log('       Slot: ' + slot.subcategory + ' / ' + slot.angle + ' / ' + slot.era + ' / ' + slot.difficulty);
+      console.log(
+        '       Slot: ' +
+        slot.subcategory +
+        ' / ' +
+        slot.angle +
+        ' / ' +
+        slot.era +
+        ' / ' +
+        slot.difficulty
+      );
+
       const q = await generateQuestionWithRetries(slot, usedTopics, questions);
+
       if (!q) {
         console.log('       No usable question for slot.');
         continue;
@@ -744,6 +1423,7 @@ async function generateCategoryBatch(category, batchNum, count, pieCategory, use
       questions.push(q);
       usedTopics.push(q.answer);
       usedTopics.push(q.topic_key);
+
       await sleep(SEARCH_DELAY_MS);
     } catch (err) {
       console.error('       Slot failed: ' + err.message);
@@ -751,6 +1431,7 @@ async function generateCategoryBatch(category, batchNum, count, pieCategory, use
   }
 
   console.log('     [' + category + '] ' + questions.length + ' questions ready');
+
   return questions;
 }
 
@@ -762,7 +1443,14 @@ async function generateBatch(batchNum, focusCategories, usedTopics) {
   for (const category of categoriesToProcess) {
     try {
       const targetCount = focusCategories ? 8 : (DISTRIBUTION[category]?.regular || 8);
-      const generated = await generateCategoryBatch(category, batchNum, targetCount, pieCategory, usedTopics);
+      const generated = await generateCategoryBatch(
+        category,
+        batchNum,
+        targetCount,
+        pieCategory,
+        usedTopics
+      );
+
       allQuestions.push(...generated);
     } catch (err) {
       console.error('     [' + category + '] Error: ' + err.message);
@@ -781,23 +1469,41 @@ async function refillBank(focusCategories) {
   }
 
   isRefilling = true;
+
   const before = await getUnusedCount();
   const target = focusCategories ? 100 : REFILL_AMOUNT;
-  const questionsPerBatch = focusCategories ? (8 * focusCategories.length) : 54;
+  const questionsPerBatch = focusCategories ? 8 * focusCategories.length : 54;
   const batchesNeeded = Math.max(3, Math.ceil(target / questionsPerBatch));
 
-  console.log('Starting diversity-slot refill — bank: ' + before + ', target: +' + target + ' (' + batchesNeeded + ' batches)');
+  console.log(
+    'Starting diversity-slot refill — bank: ' +
+    before +
+    ', target: +' +
+    target +
+    ' (' +
+    batchesNeeded +
+    ' batches)'
+  );
 
   let totalAdded = 0;
   const usedTopics = [];
 
   try {
     for (let i = 1; i <= batchesNeeded; i++) {
-      console.log('   === Batch ' + i + '/' + batchesNeeded + ' (topic memory: ' + usedTopics.length + ' items) ===');
+      console.log(
+        '   === Batch ' +
+        i +
+        '/' +
+        batchesNeeded +
+        ' (topic memory: ' +
+        usedTopics.length +
+        ' items) ==='
+      );
 
       const questions = await generateBatch(i, focusCategories, usedTopics);
       const inserted = await insertQuestions(questions);
       const count = parseInt(inserted, 10) || 0;
+
       totalAdded += count;
 
       // Keep a local memory even if insertQuestions drops duplicates.
@@ -806,11 +1512,21 @@ async function refillBank(focusCategories) {
         if (q.topic_key) usedTopics.push(q.topic_key);
       });
 
-      console.log('   Batch ' + i + ' complete: ' + count + ' inserted, ' + totalAdded + ' total so far');
+      console.log(
+        '   Batch ' +
+        i +
+        ' complete: ' +
+        count +
+        ' inserted, ' +
+        totalAdded +
+        ' total so far'
+      );
+
       if (i < batchesNeeded) await sleep(BATCH_DELAY_MS);
     }
 
     await logRefill(before, totalAdded, 'success');
+
     const after = await getUnusedCount();
     console.log('Refill complete — bank now has ' + after + ' (+' + totalAdded + ')');
   } catch (err) {
@@ -825,6 +1541,7 @@ async function checkAndRefillIfNeeded() {
   if (isRefilling) return;
 
   const total = await getUnusedCount();
+
   if (total < THRESHOLD) {
     console.log('Total bank low (' + total + ') — triggering full refill');
     refillBank();
@@ -832,6 +1549,7 @@ async function checkAndRefillIfNeeded() {
   }
 
   const lowCats = await getLowCategories();
+
   if (lowCats.length > 0) {
     const names = lowCats.map(r => r.category);
     console.log('Low categories: ' + names.join(', ') + ' — triggering targeted refill');
@@ -844,6 +1562,7 @@ module.exports = {
   checkAndRefillIfNeeded,
   isRefilling: () => isRefilling,
   generateBatch,
+
   // Exported for quick local tests/debugging.
   buildSlotsForCategory,
   classifyQuestionType,
