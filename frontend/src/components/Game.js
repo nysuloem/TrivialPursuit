@@ -904,6 +904,9 @@ export default function Game() {
   const [revealed,   setRevealed]   = useState(false);
   const [bankCount,      setBankCount]      = useState(null);
   const [categoryCounts, setCategoryCounts] = useState({});
+  const [questionsUsed,  setQuestionsUsed]  = useState(() =>
+    Object.fromEntries(CATEGORIES.map(c => [c, 0]))
+  );
   const [loading,    setLoading]    = useState(false);
   const [error,      setError]      = useState(null);
   const [flash,      setFlash]      = useState(null);
@@ -1065,6 +1068,9 @@ export default function Game() {
       const data = await getQuestion(cat, isPieTurn);
       setQuestion(data.question);
       setRevealed(false);
+
+      // Track questions used per category for this game
+      setQuestionsUsed(prev => ({ ...prev, [cat]: (prev[cat] || 0) + 1 }));
 
       // Start pre-fetching audio using ref to guarantee correct team
       const currentTeam = activeTeamRef.current;
@@ -1362,6 +1368,32 @@ export default function Game() {
             fontFamily:'monospace', fontSize:14, letterSpacing:3,
             fontWeight:700,
           }}>↺ PLAY AGAIN</button>
+
+          {/* Questions used this game */}
+          <div style={{ marginTop:16, maxWidth:400, width:'100%', background:'#0d0d0d', border:'1px solid #1a1a1a', borderRadius:8, padding:'12px 16px' }}>
+            <div style={{ fontSize:9, color:'#333', fontFamily:'monospace', textAlign:'center', letterSpacing:2, marginBottom:10 }}>
+              QUESTIONS USED THIS GAME · {Object.values(questionsUsed).reduce((a,b)=>a+b,0)} TOTAL
+            </div>
+            {CATEGORIES.map(cat => {
+              const count = questionsUsed[cat] || 0;
+              const max = Math.max(...Object.values(questionsUsed), 1);
+              return (
+                <div key={cat} style={{ display:'flex', alignItems:'center', gap:8, marginBottom:5 }}>
+                  <span style={{ fontSize:12 }}>{CAT_EMOJI[cat]}</span>
+                  <div style={{ flex:1, height:4, background:'#1a1a1a', borderRadius:2, overflow:'hidden' }}>
+                    <div style={{
+                      height:'100%',
+                      width: `${(count/max)*100}%`,
+                      background: CAT_COLORS[cat],
+                      borderRadius:2,
+                      transition:'width 0.6s ease',
+                    }} />
+                  </div>
+                  <span style={{ fontSize:10, color:'#444', fontFamily:'monospace', minWidth:16, textAlign:'right' }}>{count}</span>
+                </div>
+              );
+            })}
+          </div>
         </div>
       </div>
     );
