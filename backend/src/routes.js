@@ -87,6 +87,10 @@ router.get('/game/all-categories', async (req, res) => {
   res.json({ categories: db.CATEGORIES });
 });
 
+// In-memory tracking of recent subcategories per category to avoid repeats
+const recentSubcats = {}; // { category: [subcat1, subcat2, subcat3] }
+const questionCount = {}; // { category: count } for era rotation (2 teen : 1 older)
+
 // POST /api/game/question — get a question for chosen category
 // Body: { category, isPie }
 router.post('/game/question', async (req, res) => {
@@ -97,9 +101,16 @@ router.post('/game/question', async (req, res) => {
   }
 
   try {
-    const question = await db.getQuestion(category, isPie);
+    // Era balance: 2 teen questions for every 1 older question
+    if (!questionCount[category]) questionCount[category] = 0;
+    const eraTarget = (questionCount[category] % 3 === 2) ? 'older' : 'teen';
+    questionCount[category]++;
+
+    // Subcategory rotation: avoid last 2 subcategories
+    const excludeSubcats = recentSubcats[category] || [];
+
+    const question = await db.getQuestion(category, isPie, eraTarget, excludeSubcats);
     if (!question) {
-      // Try regular question as fallback if no pie available
       if (isPie) {
         const fallback = await db.getQuestion(category, false);
         if (fallback) {
@@ -109,9 +120,14 @@ router.post('/game/question', async (req, res) => {
       return res.status(404).json({ error: 'No questions available for this category' });
     }
 
-    // Check if a pie question exists for this category (for streak tracking on frontend)
-    const pieAvailable = await db.hasPieQuestion(category);
+    // Track subcategory to avoid repeating it next time
+    if (question.subcategory && question.subcategory !== 'general') {
+      if (!recentSubcats[category]) recentSubcats[category] = [];
+      recentSubcats[category].push(question.subcategory);
+      if (recentSubcats[category].length > 2) recentSubcats[category].shift(); // keep last 2
+    }
 
+    const pieAvailable = await db.hasPieQuestion(category);
     res.json({ question, pieAvailable });
   } catch (err) {
     console.error(err);
