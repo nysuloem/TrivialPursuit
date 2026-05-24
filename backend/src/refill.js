@@ -32,7 +32,11 @@ const CATEGORY_SEARCH_GUIDANCE = {
     'NATURE: interesting animals facts behaviors records, plants trees fungi surprising facts, ocean sea life facts, weather climate natural phenomena, ecosystems environments surprising nature facts',
   ].join(' | '),
   'Sports & Games': 'ROTATE between these three types equally: (1) SPORTS: NHL NBA NFL MLB PGA golf records championships stars moments 1980s to present, (2) VIDEO GAMES: Nintendo PlayStation Xbox Steam gaming history console wars popular franchises Minecraft Fortnite Mario Pokemon GTA Zelda esports, (3) BOARD GAMES: Monopoly chess poker Magic The Gathering Dungeons Dragons Scrabble card games trivia',
-  'Pop Culture & Current Events': 'viral pop culture moments teenagers recent, biggest North American news stories recent, recent celebrity drama US Canada, trending Gen Z internet culture, major world events affecting North Americans, surprising political news Canada United States, viral social media moments mainstream news',
+  'Pop Culture & Current Events': [
+    'CURRENT EVENTS: search CBC News, CTV News, ABC News, BBC News, CNN for major North American and world news stories from the last 12 months — politics, world events, disasters, elections, major trials, surprising news',
+    'POP CULTURE: viral moments celebrities trends social media Gen Z culture recent — search Entertainment Tonight, People, TMZ, BuzzFeed for recent celebrity news and viral moments',
+    'TEEN CULTURE: TikTok trends YouTube milestones gaming crossovers Gen Z slang viral products recent',
+  ].join(' | '),
 };
 
 const QUESTION_SYSTEM_PROMPT = [
@@ -70,7 +74,21 @@ const QUESTION_SYSTEM_PROMPT = [
   '',
   '=== OUTPUT ===',
   'Respond ONLY with valid JSON, no markdown, no code blocks:',
-  '{ "questions": [ { "category": "...", "question": "...", "answer": "...", "is_pie": false, "canadian": false } ] }',
+  '{ "questions": [ { "category": "...", "question": "...", "answer": "...", "is_pie": false, "canadian": false, "subcategory": "...", "era": "..." } ] }',
+  '',
+  'SUBCATEGORY must be one specific word describing the topic type. Examples:',
+  '- Sports & Games: "nhl", "nba", "nfl", "mlb", "golf", "olympics", "tennis", "soccer", "video_games", "board_games", "card_games", "esports"',
+  '- TV, Movies & Music: "tv_show", "movie", "music", "streaming", "reality_tv"',
+  '- Science & Nature: "space", "animals", "human_body", "technology", "plants", "weather", "chemistry", "physics", "scientists", "food_science", "ocean"',
+  '- Pop Culture & Current Events: "current_events", "celebrity", "teen_culture", "viral", "politics", "sports_news"',
+  '- Geography: "capitals", "countries", "rivers", "mountains", "records", "cities", "borders"',
+  '- History: "ancient", "medieval", "world_wars", "cold_war", "civil_rights", "modern", "exploration"',
+  '',
+  'ERA must be one of:',
+  '- "teen" — content from 2015 to present that teenagers would know',
+  '- "millennial" — content from 1990-2014',
+  '- "classic" — content from before 1990',
+  '- "timeless" — facts that have no specific era (animal facts, geography, science principles)',
 ].join('\n');
 
 // Step 1: Ask GPT to generate creative search queries for a category
@@ -142,7 +160,7 @@ async function searchWeb(query) {
         tools,
         messages: [{
           role: 'user',
-          content: 'Search for: ' + query + '\n\nFind surprising but ACCESSIBLE facts — things that would make someone say "wow I didn\'t know that!" rather than "I could never have known that." Focus on facts with clear specific answers (names, numbers, dates, places) that a curious person might know or could reasonably guess from context. Return 4-6 bullet points of the most trivia-worthy accessible facts.',
+          content: 'Today is ' + new Date().toLocaleDateString('en-US', {year:'numeric', month:'long', day:'numeric'}) + '. Search for: ' + query + '\n\nFind surprising but ACCESSIBLE facts — prioritize recent content where relevant. Focus on facts with clear specific answers (names, numbers, dates, places). Return 4-6 bullet points of the most trivia-worthy accessible facts, noting the year for recent events.',
         }],
       });
       const content = response.choices[0].message.content || '';
@@ -320,7 +338,7 @@ async function rewriteQuestion(q) {
 
     const result = JSON.parse(response.choices[0].message.content || '{}');
     if (result.question && !answerInQuestion(result.question, q.answer)) {
-      return { ...q, question: result.question.trim() };
+      return { ...q, question: result.question.trim() }; // preserves subcategory and era
     }
     return null;
   } catch (e) {
@@ -371,6 +389,21 @@ async function generateBatch(batchNum, focusCategories, usedTopics) {
           await new Promise(r => setTimeout(r, 500));
         }
       }
+    } else if (category === 'Pop Culture & Current Events') {
+      console.log('     [' + category + '] Running 3 targeted searches (news / celebrity / teen culture)...');
+      const today = new Date().toLocaleDateString('en-US', {year:'numeric', month:'long'});
+      const popQueries = [
+        await generateSearchQueries('CURRENT EVENTS NEWS: search CBC News CTV News ABC News BBC News CNN for major North American world news stories recent months ' + today + ' — politics elections world events surprising news facts', usedTopics),
+        await generateSearchQueries('CELEBRITY POP CULTURE: recent celebrity news drama viral moments Entertainment social media trending ' + today, usedTopics),
+        await generateSearchQueries('TEEN GEN Z CULTURE: TikTok trends YouTube milestones gaming crossovers Gen Z viral products internet moments recent ' + today, usedTopics),
+      ];
+      for (const queries of popQueries) {
+        if (queries.length > 0) {
+          const result = await searchWeb(queries[0]);
+          if (result) searchResults.push(result);
+          await new Promise(r => setTimeout(r, 500));
+        }
+      }
     } else if (category === 'Science & Nature') {
       console.log('     [' + category + '] Running 2 sub-type searches (science / nature)...');
       const sciNatQueries = [
@@ -385,7 +418,7 @@ async function generateBatch(batchNum, focusCategories, usedTopics) {
         }
       }
     } else {
-      // Standard search for other categories
+      // Standard search for Geography, History, and other categories
       const queries = await generateSearchQueries(category, usedTopics);
       console.log('     [' + category + '] Queries: ' + queries.slice(0, 2).join(' | ') + '...');
       for (const query of queries.slice(0, 2)) {
@@ -421,6 +454,8 @@ async function generateBatch(batchNum, focusCategories, usedTopics) {
           answer: String(q.answer).trim(),
           is_pie: q.is_pie === true,
           canadian: q.canadian === true,
+          subcategory: String(q.subcategory || 'general').toLowerCase().replace(/[^a-z_]/g, '_').substring(0, 50),
+          era: ['teen','millennial','classic','timeless'].includes(q.era) ? q.era : 'millennial',
         };
         if (answerInQuestion(mapped.question, mapped.answer)) {
           needsRewrite.push(mapped);
