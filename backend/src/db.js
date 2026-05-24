@@ -276,7 +276,7 @@ async function insertQuestions(questions) {
          VALUES ($1, $2, $3, $4, $5, $6, $7)
          ON CONFLICT (LOWER(question)) DO NOTHING`,
         [q.category, q.question, q.answer, q.is_pie || false, q.canadian || false,
-         q.subcategory || 'general', q.era || 'millennial']
+         q.subcategory || 'untagged', q.era || 'millennial']
       );
       inserted += r.rowCount;
     }
