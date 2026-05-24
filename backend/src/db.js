@@ -52,6 +52,12 @@ async function initDB() {
     await client.query(`CREATE INDEX IF NOT EXISTS idx_q_used ON questions(used)`);
     await client.query(`CREATE INDEX IF NOT EXISTS idx_q_pie ON questions(is_pie, used)`);
 
+    // Add subcategory and era columns if they don't exist
+    await client.query(`ALTER TABLE questions ADD COLUMN IF NOT EXISTS subcategory TEXT DEFAULT 'general'`);
+    await client.query(`ALTER TABLE questions ADD COLUMN IF NOT EXISTS era TEXT DEFAULT 'millennial'`);
+    await client.query(`CREATE INDEX IF NOT EXISTS idx_q_subcat ON questions(category, subcategory, used)`);
+    await client.query(`CREATE INDEX IF NOT EXISTS idx_q_era ON questions(category, era, used)`);
+
     // Clean up any existing duplicates FIRST (keep lowest id)
     await client.query(`
       DELETE FROM questions
@@ -137,18 +143,69 @@ async function getTwoCategoryOptions(ownedCategories = []) {
   return r.rows.map(row => row.category);
 }
 
-// Pull a single unused question for a category (regular or pie)
-async function getQuestion(category, isPie = false) {
+// Pull a single unused question with era balance and subcategory rotation
+// eraTarget: 'teen' | 'older' | null (null = no preference)
+// excludeSubcats: array of recent subcategories to avoid
+async function getQuestion(category, isPie = false, eraTarget = null, excludeSubcats = []) {
+  // Build era clause
+  let eraClause = '';
+  let params = [category, isPie];
+  
+  if (eraTarget === 'teen') {
+    eraClause = "AND era = 'teen'";
+  } else if (eraTarget === 'older') {
+    eraClause = "AND era != 'teen'";
+  }
+
+  // Build subcategory exclusion clause
+  let subcatClause = '';
+  if (excludeSubcats.length > 0) {
+    subcatClause = `AND subcategory != ALL($${params.length + 1}::text[])`;
+    params.push(excludeSubcats);
+  }
+
   const r = await pool.query(`
-    SELECT id, category, question, answer, is_pie, canadian
+    SELECT id, category, question, answer, is_pie, canadian, subcategory, era
     FROM questions
     WHERE category = $1
       AND used = FALSE
       AND is_pie = $2
+      ${eraClause}
+      ${subcatClause}
     ORDER BY RANDOM()
     LIMIT 1
-  `, [category, isPie]);
-  return r.rows[0] || null;
+  `, params);
+
+  // Fallback: if no match with constraints, try without subcategory restriction
+  if (!r.rows[0] && excludeSubcats.length > 0) {
+    const fallback = await pool.query(`
+      SELECT id, category, question, answer, is_pie, canadian, subcategory, era
+      FROM questions
+      WHERE category = $1
+        AND used = FALSE
+        AND is_pie = $2
+        ${eraClause}
+      ORDER BY RANDOM()
+      LIMIT 1
+    `, [category, isPie]);
+    if (fallback.rows[0]) return fallback.rows[0];
+  }
+
+  // Final fallback: no era constraint
+  if (!r.rows[0]) {
+    const final = await pool.query(`
+      SELECT id, category, question, answer, is_pie, canadian, subcategory, era
+      FROM questions
+      WHERE category = $1
+        AND used = FALSE
+        AND is_pie = $2
+      ORDER BY RANDOM()
+      LIMIT 1
+    `, [category, isPie]);
+    return final.rows[0] || null;
+  }
+
+  return r.rows[0];
 }
 
 // Mark question as used (permanently consumed)
@@ -215,10 +272,11 @@ async function insertQuestions(questions) {
     await client.query('BEGIN');
     for (const q of questions) {
       const r = await client.query(
-        `INSERT INTO questions (category, question, answer, is_pie, canadian)
-         VALUES ($1, $2, $3, $4, $5)
+        `INSERT INTO questions (category, question, answer, is_pie, canadian, subcategory, era)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)
          ON CONFLICT (LOWER(question)) DO NOTHING`,
-        [q.category, q.question, q.answer, q.is_pie || false, q.canadian || false]
+        [q.category, q.question, q.answer, q.is_pie || false, q.canadian || false,
+         q.subcategory || 'general', q.era || 'millennial']
       );
       inserted += r.rowCount;
     }
