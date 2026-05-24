@@ -930,7 +930,9 @@ export default function Game() {
   const loadCategoryOptions = useCallback(async (activeTeam, currentWedges, checkFinal = true) => {
     setLoading(true); setError(null);
     try {
-      // If the OTHER team has all wedges (is in final mode), go back to final pick after this turn
+      // Only redirect to FINAL_PICK if:
+      // 1. checkFinal is true (not overridden)
+      // 2. The OTHER team (not the one about to play) has all wedges
       if (checkFinal && finalTeam !== null && finalTeam !== activeTeam) {
         setActive(finalTeam);
         setState(S.FINAL_PICK);
@@ -1205,11 +1207,12 @@ export default function Game() {
     setStreak(prev => { const n=[...prev]; n[active]={...n[active],[chosenCat]:0}; return n; });
 
     if (state === S.FINAL) {
-      // Wrong on final — other team gets their normal turn first, then come back to final
+      // Wrong on final — other team gets a normal turn
+      // Pass checkFinal=false so loadCategoryOptions doesn't immediately redirect back
       const nextTeam = 1 - active;
       setActive(nextTeam);
       playSwish(getAudio());
-      await loadCategoryOptions(nextTeam, wedges);
+      await loadCategoryOptions(nextTeam, wedges, false);
       return;
     }
 
@@ -1222,7 +1225,7 @@ export default function Game() {
     const nextTeam = 1 - active;
     setActive(nextTeam);
     playSwish(getAudio());
-    await loadCategoryOptions(nextTeam, wedges);
+    await loadCategoryOptions(nextTeam, wedges, true);
   };
 
   const handleSkip = async () => {
