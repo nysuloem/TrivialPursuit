@@ -15,7 +15,7 @@ const CAT_COLORS = {
   'History':          '#eab308',
   'Science & Nature': '#22c55e',
   'Sports & Games':   '#7c3aed',
-  'Pop Culture & Current Events': '#0891b2',
+  'Pop Culture & Current Events': '#f97316',
 };
 
 const CAT_EMOJI = {
