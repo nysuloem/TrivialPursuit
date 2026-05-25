@@ -55,7 +55,7 @@ const ERA_POOLS = {
     '1990s', 'timeless', '2020s', 'timeless', '2010s',
   ],
   Geography: ['timeless', 'timeless', '2020s', '2000s', '1990s'],
-  History: ['timeless', '1980s', '1990s', '2000s', '2020s', 'classic'],
+  History: ['timeless', 'classic', '1980s', '1990s', '2000s', 'timeless', 'classic', '1980s'],
 };
 
 const CATEGORY_SLOT_PLANS = {
@@ -105,13 +105,13 @@ const CATEGORY_SLOT_PLANS = {
   ],
 
   History: [
-    { subcategory: 'modern', count: 2 },
-    { subcategory: 'world_wars', count: 1 },
+    { subcategory: 'world_wars', count: 2 },
     { subcategory: 'cold_war', count: 1 },
     { subcategory: 'civil_rights', count: 1 },
     { subcategory: 'exploration', count: 1 },
     { subcategory: 'ancient', count: 1 },
     { subcategory: 'medieval', count: 1 },
+    { subcategory: 'modern', count: 1 },
   ],
 };
 
@@ -440,6 +440,8 @@ const QUESTION_ANGLES = {
       'scandals',
       'turning_points',
       'leaders',
+      'cold_war_era',
+      'social_movements',
     ],
     world_wars: [
       'home_front',
@@ -1553,6 +1555,16 @@ function buildSearchQuery(slot) {
     ].filter(Boolean).join(' ');
   }
 
+  if (slot.category === 'History') {
+    return [
+      eraText,
+      guidance,
+      'history trivia up to year 2000 only — no events after 2000',
+      'focus on events before year 2000: ancient history, medieval, age of exploration, world wars, cold war, civil rights movements, 1980s 1990s history',
+      'accessible family trivia recognizable North America',
+    ].filter(Boolean).join(' ');
+  }
+
   if (slot.category === 'Science & Nature') {
     return [
       eraText,
@@ -1843,6 +1855,7 @@ async function generateQuestionForSlot(slot, content, usedTopics) {
     '- Do not default every sports question to a player stat.',
     '- For 1980s, 1990s, and 2000s slots, choose content genuinely associated with that decade.',
     '- For timeless slots, choose broadly familiar facts not tied to one news cycle.',
+    '- For History category: NEVER write questions about events after year 2000. History questions must be about events that happened before 2001. The 1990s is the most recent era allowed for History.',
     '- For Science & Nature, avoid elementary-school obvious questions. Ask about mechanisms, adaptations, discoveries, comparisons, or applications.',
     '- For Science & Nature, the answer should be recognizable, but the clue should not be a basic definition.',
     '- For current_events and sports_news, use only the fresh source material provided.',
