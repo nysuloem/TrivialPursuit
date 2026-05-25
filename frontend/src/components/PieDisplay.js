@@ -12,10 +12,10 @@ const CATEGORIES = [
 const CAT_COLORS = {
   'Geography':        '#3b82f6',
   'TV, Movies & Music':'#ef4444',
-  'History':          '#b45309',
-  'Science & Nature': '#d97706',
+  'History':          '#eab308',
+  'Science & Nature': '#22c55e',
   'Sports & Games':   '#7c3aed',
-  'Pop Culture & Current Events':      '#0891b2',
+  'Pop Culture & Current Events': '#0891b2',
 };
 
 const CAT_EMOJI = {

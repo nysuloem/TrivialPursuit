@@ -216,7 +216,10 @@ const TEAMS = [
 
 const S = {
   INTRO:            'intro',          // opening splash screen
-  DICE_ROLL:        'dice_roll',     // who goes first screen
+  DICE_ROLL:        'dice_roll',
+  LUCKY_PIE:        'lucky_pie',      // dramatic lucky pie announcement
+  STEAL_CELEBRATE:  'steal_celebrate',// steal success celebration
+  STEAL_PICK:       'steal_pick',     // pick which wedge to take from opponent     // who goes first screen
   CHOOSING:         'choosing',
   CAT_SPLASH:       'cat_splash',
   QUESTION:         'question',
@@ -230,6 +233,145 @@ const S = {
 };
 
 // Short display names removed — use full names everywhere
+
+// ─── STEAL CELEBRATION ───────────────────────────────────────────────────
+function StealCelebration({ team, category, onDone }) {
+  const [step, setStep] = useState(0);
+  useEffect(() => {
+    const t1 = setTimeout(() => setStep(1), 200);
+    const t2 = setTimeout(() => setStep(2), 800);
+    const t3 = setTimeout(() => onDone(), 2800);
+    return () => [t1,t2,t3].forEach(clearTimeout);
+  }, [onDone]);
+
+  return (
+    <div style={{
+      position:'fixed', inset:0, zIndex:999,
+      background: `radial-gradient(ellipse at center, ${team.color}22 0%, #0a0a0a 70%)`,
+      display:'flex', flexDirection:'column',
+      alignItems:'center', justifyContent:'center', gap:16,
+    }}>
+      <style>{`
+        @keyframes stealSlam   { 0%{transform:scale(3) rotate(15deg);opacity:0} 60%{transform:scale(0.9) rotate(-3deg)} 100%{transform:scale(1) rotate(0deg);opacity:1} }
+        @keyframes stealShake  { 0%,100%{transform:translateX(0)} 20%{transform:translateX(-8px)} 40%{transform:translateX(8px)} 60%{transform:translateX(-5px)} 80%{transform:translateX(5px)} }
+        @keyframes stealGlow   { 0%,100%{text-shadow:0 0 20px currentColor} 50%{text-shadow:0 0 60px currentColor, 0 0 100px currentColor} }
+        @keyframes confettiFall { 0%{transform:translateY(-20px) rotate(0deg);opacity:1} 100%{transform:translateY(100vh) rotate(720deg);opacity:0} }
+      `}</style>
+
+      {/* Confetti */}
+      {step >= 1 && ['🔴','🟡','🟢','🔵','🟠','🟣'].map((dot, i) => (
+        <div key={i} style={{
+          position:'absolute',
+          left: `${15 + i * 14}%`,
+          top: '-20px',
+          fontSize: 16,
+          animation: `confettiFall ${1.5 + i * 0.2}s ${i * 0.1}s ease-in forwards`,
+        }}>{dot}</div>
+      ))}
+
+      {step >= 1 && (
+        <div style={{
+          fontSize: 72,
+          animation: 'stealSlam 0.5s cubic-bezier(0.34,1.56,0.64,1) forwards',
+          filter: `drop-shadow(0 0 20px ${team.color})`,
+        }}>🕵️</div>
+      )}
+
+      {step >= 2 && (
+        <>
+          <div style={{
+            fontSize: 'clamp(32px,7vw,52px)', fontWeight: 900,
+            color: team.color, fontFamily: 'Georgia,serif',
+            animation: 'stealGlow 0.8s ease infinite, stealShake 0.4s ease',
+            textAlign: 'center',
+          }}>
+            STOLEN! 🎉
+          </div>
+          <div style={{ textAlign: 'center' }}>
+            <div style={{ fontSize: 15, color: team.color, fontFamily: 'monospace', letterSpacing: 2 }}>
+              {team.emoji} {team.label.toUpperCase()}
+            </div>
+            <div style={{ fontSize: 12, color: '#555', fontFamily: 'monospace', marginTop: 4 }}>
+              {CAT_EMOJI[category]} {category} WEDGE STOLEN!
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+// ─── LUCKY PIE ANNOUNCEMENT ──────────────────────────────────────────────
+function LuckyPieAnnounce({ team, category, onDone }) {
+  const [step, setStep] = useState(0);
+  useEffect(() => {
+    const t1 = setTimeout(() => setStep(1), 400);
+    const t2 = setTimeout(() => setStep(2), 1000);
+    const t3 = setTimeout(() => setStep(3), 1800);
+    const t4 = setTimeout(() => onDone(), 3200);
+    return () => [t1,t2,t3,t4].forEach(clearTimeout);
+  }, [onDone]);
+
+  return (
+    <div style={{
+      position:'fixed', inset:0, zIndex:999,
+      background:'#0a0a0a',
+      display:'flex', flexDirection:'column',
+      alignItems:'center', justifyContent:'center',
+      gap:20,
+    }}>
+      <style>{`
+        @keyframes luckyBounce { 0%{transform:scale(0) rotate(-20deg);opacity:0} 60%{transform:scale(1.3) rotate(5deg)} 100%{transform:scale(1) rotate(0deg);opacity:1} }
+        @keyframes luckyGlow   { 0%,100%{text-shadow:0 0 30px #fbbf24,0 0 60px #fbbf24} 50%{text-shadow:0 0 60px #fbbf24,0 0 120px #fbbf24,0 0 180px #fbbf24} }
+        @keyframes starSpin    { 0%{transform:rotate(0deg) scale(0);opacity:0} 100%{transform:rotate(360deg) scale(1);opacity:1} }
+        @keyframes slideUp     { 0%{transform:translateY(30px);opacity:0} 100%{transform:translateY(0);opacity:1} }
+      `}</style>
+
+      {/* Stars */}
+      {step >= 1 && (
+        <div style={{ position:'absolute', inset:0, pointerEvents:'none' }}>
+          {['10%','20%','80%','90%','50%','30%','70%'].map((left, i) => (
+            <div key={i} style={{
+              position:'absolute', left, top: `${10 + i*12}%`,
+              fontSize:20, animation:`starSpin 0.6s ${i*0.1}s ease both`,
+            }}>⭐</div>
+          ))}
+        </div>
+      )}
+
+      {step >= 1 && (
+        <div style={{
+          fontSize:80,
+          animation:'luckyBounce 0.6s cubic-bezier(0.34,1.56,0.64,1) forwards',
+          filter:'drop-shadow(0 0 30px #fbbf24)',
+        }}>🥧</div>
+      )}
+
+      {step >= 2 && (
+        <div style={{
+          fontSize:'clamp(28px,6vw,42px)', fontWeight:900, color:'#fbbf24',
+          fontFamily:'Georgia,serif', textAlign:'center',
+          animation:'luckyGlow 1s ease infinite, slideUp 0.4s ease forwards',
+        }}>
+          🎲 LUCKY PIE!
+        </div>
+      )}
+
+      {step >= 3 && (
+        <div style={{
+          textAlign:'center', animation:'slideUp 0.4s ease forwards',
+        }}>
+          <div style={{ fontSize:16, color: CAT_COLORS[category], fontFamily:'monospace', letterSpacing:2 }}>
+            {CAT_EMOJI[category]} {category}
+          </div>
+          <div style={{ fontSize:13, color:'#555', fontFamily:'monospace', marginTop:6 }}>
+            {team.emoji} {team.label.toUpperCase()} — YOUR LUCKY SHOT!
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 // ─── OPENING SCENE ────────────────────────────────────────────────────────
 function IntroScene({ onDone }) {
@@ -933,11 +1075,8 @@ export default function Game() {
   const loadCategoryOptions = useCallback(async (activeTeam, currentWedges, checkFinal = true) => {
     setLoading(true); setError(null);
     try {
-      // Only redirect to FINAL_PICK if:
-      // 1. checkFinal is true (not overridden)
-      // 2. The OTHER team (not the one about to play) has all wedges
-      if (checkFinal && finalTeam !== null && finalTeam !== activeTeam) {
-        setActive(finalTeam);
+      // If this team is in final mode, go straight to FINAL_PICK
+      if (checkFinal && finalTeam !== null && finalTeam === activeTeam) {
         setState(S.FINAL_PICK);
         setLoading(false);
         return;
@@ -1034,13 +1173,13 @@ export default function Game() {
   }, [question]);
 
   // Calculate random pie chance based on score
-  // 0-5 pts: 0%, 6-10: 20%, 11-15: 35%, 16-20: 50%, 21+: 65%
+  // 0-5 pts: 0%, 6-10: 5%, 11-15: 10%, 16-20: 15%, 21+: 20%
   const getRandomPieChance = (score) => {
     if (score <= 5)  return 0;
-    if (score <= 10) return 0.20;
-    if (score <= 15) return 0.35;
-    if (score <= 20) return 0.50;
-    return 0.65;
+    if (score <= 10) return 0.05;
+    if (score <= 15) return 0.10;
+    if (score <= 20) return 0.15;
+    return 0.20;
   };
 
   // Team picks a category from the choosing screen
@@ -1094,7 +1233,11 @@ export default function Game() {
 
       if (isPieTurn) {
         playPieSting(getAudio());
-        setState(S.PIE_INTRO);
+        if (luckyPie) {
+          setState(S.LUCKY_PIE);
+        } else {
+          setState(S.PIE_INTRO);
+        }
       } else {
         setState(S.CAT_SPLASH);
       }
@@ -1142,10 +1285,10 @@ export default function Game() {
   };
 
   // Check if a team just completed all wedges — if so, trigger final question
-  const checkForFinal = (teamIdx, newWedges, nextActive) => {
+  const checkForFinal = (teamIdx, newWedges) => {
     if (newWedges[teamIdx].length === CATEGORIES.length) {
       setFinalTeam(teamIdx);
-      setFinalUsedCats([]); // reset used categories for fresh final run
+      setFinalUsedCats([]);
       setActive(teamIdx);
       setState(S.FINAL_PICK);
       return true;
@@ -1177,11 +1320,10 @@ export default function Game() {
       setStreak(prev => { const n=[...prev]; n[active]={...n[active],[chosenCat]:0}; return n; });
 
       if (newWedges[active].length === CATEGORIES.length) {
-        // Check for final question instead of instant win
-        if (checkForFinal(active, newWedges, active)) return;
+        if (checkForFinal(active, newWedges)) return;
       }
 
-      // Show pie win celebration
+      // Show pie win celebration then continue their turn
       setPieWinCat(chosenCat);
       setState(S.PIE_WIN);
       return;
@@ -1202,7 +1344,8 @@ export default function Game() {
       } catch (e) { setError(e.message); }
       finally { setLoading(false); }
     } else {
-      await loadCategoryOptions(active, wedges);
+      // If active team is in final mode, go back to FINAL_PICK
+      await loadCategoryOptions(active, wedges, true);
     }
   };
 
@@ -1213,12 +1356,13 @@ export default function Game() {
     setStreak(prev => { const n=[...prev]; n[active]={...n[active],[chosenCat]:0}; return n; });
 
     if (state === S.FINAL) {
-      // Wrong on final — other team gets a normal turn
-      // Pass checkFinal=false so loadCategoryOptions doesn't immediately redirect back
+      // Wrong on final — other team gets normal turns
+      // They keep playing until THEY get something wrong, then we return here
       const nextTeam = 1 - active;
       setActive(nextTeam);
       playSwish(getAudio());
-      await loadCategoryOptions(nextTeam, wedges, false);
+      // checkFinal=true so when nextTeam gets something wrong, it'll check if they need FINAL_PICK too
+      await loadCategoryOptions(nextTeam, wedges, true);
       return;
     }
 
@@ -1247,13 +1391,7 @@ export default function Game() {
     newScores[stealingTeam] += 1;
     setScores(newScores);
 
-    const newWedges = awardWedge(stealingTeam, chosenCat, wedges);
-    setWedges(newWedges);
-    playWedgeWon(getAudio());
-
     // Reset BOTH teams' streaks for this category
-    // — stealing team gets the wedge (streak irrelevant)
-    // — original team must earn pie chance again from scratch
     setStreak(prev => {
       const n = [...prev];
       n[stealingTeam] = { ...n[stealingTeam], [chosenCat]: 0 };
@@ -1261,11 +1399,52 @@ export default function Game() {
       return n;
     });
 
-    if (checkForFinal(stealingTeam, newWedges, stealingTeam)) return;
+    // If stealing team already owns this wedge, let them pick one from opponent instead
+    if (wedges[stealingTeam].includes(chosenCat)) {
+      playWedgeWon(getAudio());
+      setActive(stealingTeam);
+      setState(S.STEAL_PICK);
+      return;
+    }
 
+    const newWedges = awardWedge(stealingTeam, chosenCat, wedges);
+    setWedges(newWedges);
+    playWedgeWon(getAudio());
+
+    if (checkForFinal(stealingTeam, newWedges)) return;
+
+    // Show steal celebration then pie win
     setPieWinCat(chosenCat);
     setActive(stealingTeam);
-    setState(S.PIE_WIN);
+    setState(S.STEAL_CELEBRATE);
+  };
+
+  // Called when stealing team picks which opponent wedge to take
+  const handleStealPickWedge = async (pickedCat) => {
+    const stealingTeam = active; // active was already set to stealingTeam
+    const losingTeam = 1 - stealingTeam;
+
+    // Remove wedge from opponent
+    const newWedges = [wedges[0].slice(), wedges[1].slice()];
+    newWedges[losingTeam] = newWedges[losingTeam].filter(c => c !== pickedCat);
+    // Add to stealing team if they don't already have it
+    if (!newWedges[stealingTeam].includes(pickedCat)) {
+      newWedges[stealingTeam].push(pickedCat);
+    }
+    setWedges(newWedges);
+
+    // Reset streaks for the picked category
+    setStreak(prev => {
+      const n = [...prev];
+      n[stealingTeam] = { ...n[stealingTeam], [pickedCat]: 0 };
+      n[losingTeam]   = { ...n[losingTeam],   [pickedCat]: 0 };
+      return n;
+    });
+
+    if (checkForFinal(stealingTeam, newWedges)) return;
+
+    setPieWinCat(pickedCat);
+    setState(S.STEAL_CELEBRATE);
   };
 
   const handleStealWrong = async () => {
@@ -1274,13 +1453,13 @@ export default function Game() {
     const nextTeam = 1 - active;
     setActive(nextTeam);
     playSwish(getAudio());
-    await loadCategoryOptions(nextTeam, wedges);
+    await loadCategoryOptions(nextTeam, wedges, true);
   };
 
   // Called when pie win celebration finishes — continue game
   const handlePieWinDone = useCallback(async () => {
     setPieWinCat(null);
-    await loadCategoryOptions(active, wedges);
+    await loadCategoryOptions(active, wedges, true);
   }, [active, wedges, loadCategoryOptions]);
 
   // Final question: opponent picks a category
@@ -1303,6 +1482,73 @@ export default function Game() {
   // ── DICE ROLL — who goes first ────────────────────────────────────────────
   if (state === S.DICE_ROLL) {
     return <DiceRoll onDone={handleDiceRollDone} />;
+  }
+
+  // ── STEAL PICK — stealing team picks which opponent wedge to take ─────────
+  if (state === S.STEAL_PICK) {
+    const losingTeam = 1 - active;
+    const opponentWedges = wedges[losingTeam];
+    return (
+      <div style={{
+        minHeight:'100vh', background:'#0a0a0a',
+        display:'flex', flexDirection:'column',
+        alignItems:'center', justifyContent:'center',
+        padding:24, gap:20, fontFamily:'Georgia,serif',
+      }}>
+        <style>{`
+          @keyframes pickPulse { 0%,100%{transform:scale(1)} 50%{transform:scale(1.05)} }
+        `}</style>
+        <div style={{ fontSize:48 }}>🕵️</div>
+        <div style={{ textAlign:'center' }}>
+          <div style={{ fontSize:11, letterSpacing:4, color:'#f97316', fontFamily:'monospace' }}>BONUS STEAL!</div>
+          <div style={{ fontSize:'clamp(20px,4vw,28px)', fontWeight:900, color:TEAMS[active].color, marginTop:4 }}>
+            {TEAMS[active].emoji} {TEAMS[active].label.toUpperCase()}
+          </div>
+          <div style={{ fontSize:13, color:'#555', fontFamily:'monospace', marginTop:6 }}>
+            You already have that wedge. Pick one from {TEAMS[losingTeam].label}!
+          </div>
+        </div>
+
+        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, maxWidth:400, width:'100%' }}>
+          {opponentWedges.map(cat => (
+            <button key={cat} onClick={() => handleStealPickWedge(cat)} style={{
+              padding:'16px 12px', borderRadius:10, cursor:'pointer',
+              border:`2px solid ${CAT_COLORS[cat]}`,
+              background:`${CAT_COLORS[cat]}15`,
+              display:'flex', flexDirection:'column', alignItems:'center', gap:6,
+              animation:'pickPulse 1.5s ease infinite',
+            }}>
+              <span style={{ fontSize:32, filter:`drop-shadow(0 0 8px ${CAT_COLORS[cat]})` }}>{CAT_EMOJI[cat]}</span>
+              <span style={{ fontSize:11, color:CAT_COLORS[cat], fontFamily:'monospace', fontWeight:700, textAlign:'center', lineHeight:1.3 }}>{cat}</span>
+            </button>
+          ))}
+        </div>
+
+        {opponentWedges.length === 0 && (
+          <div style={{ color:'#555', fontFamily:'monospace', fontSize:13 }}>
+            Opponent has no wedges to steal!
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // ── STEAL CELEBRATION ────────────────────────────────────────────────────
+  if (state === S.STEAL_CELEBRATE) {
+    return <StealCelebration
+      team={TEAMS[active]}
+      category={chosenCat}
+      onDone={() => setState(S.PIE_WIN)}
+    />;
+  }
+
+  // ── LUCKY PIE ANNOUNCEMENT ───────────────────────────────────────────────
+  if (state === S.LUCKY_PIE) {
+    return <LuckyPieAnnounce
+      team={TEAMS[active]}
+      category={chosenCat}
+      onDone={() => setState(S.PIE_INTRO)}
+    />;
   }
 
   // ── WINNER ────────────────────────────────────────────────────────────────
@@ -1644,11 +1890,16 @@ export default function Game() {
                 }}
               >{speaking ? '🔇' : '🔁'}</button>
               {question.canadian && <div style={{ fontSize:8, color:'#cc000099', fontFamily:'monospace' }}>🍁</div>}
-              {!isPieState && state !== S.FINAL && (
-                <button onClick={handleSkip} disabled={loading} style={{ padding:'2px 8px', borderRadius:3, border:'1px solid #222', background:'transparent', color:'#333', cursor:'pointer', fontSize:9, fontFamily:'monospace' }}>
-                  SKIP
-                </button>
-              )}
+              <button onClick={handleSkip} disabled={loading} style={{
+                padding:'4px 12px', borderRadius:4,
+                border:`1px solid ${isPieState ? '#fbbf2444' : '#2a2a2a'}`,
+                background: isPieState ? '#fbbf2410' : 'transparent',
+                color: isPieState ? '#fbbf2499' : '#555',
+                cursor:'pointer', fontSize:10,
+                fontFamily:'monospace', letterSpacing:1,
+              }}>
+                ⟳ SKIP
+              </button>
             </div>
           </div>
 
