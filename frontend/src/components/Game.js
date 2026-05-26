@@ -402,11 +402,11 @@ function IntroScene({ onDone }) {
         cursor: phase === 'tap' ? 'pointer' : 'default',
       }}
     >
-      <style>{\`
+      <style>{`
         @keyframes tapPulse  { 0%,100%{opacity:0.6;transform:scale(1)} 50%{opacity:1;transform:scale(1.05)} }
         @keyframes playPulse { 0%,100%{transform:scale(1);box-shadow:0 0 20px #fbbf2444} 50%{transform:scale(1.04);box-shadow:0 0 40px #fbbf2488} }
         @keyframes fadeIn    { 0%{opacity:0;transform:translateY(16px)} 100%{opacity:1;transform:translateY(0)} }
-      \`}</style>
+      `}</style>
 
       {/* Video */}
       <video
