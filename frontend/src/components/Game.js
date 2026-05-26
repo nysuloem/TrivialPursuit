@@ -1789,14 +1789,14 @@ export default function Game() {
                 return (
                   <button key="ROLL_AGAIN" onClick={() => loadCategoryOptions(active, wedges)} disabled={loading} style={{
                     padding:'22px 24px', borderRadius:12,
-                    border:'2px solid #22c55e55',
-                    background:'#22c55e10',
+                    border:'2px solid #ec489955',
+                    background:'#ec489910',
                     color:'#fff', cursor:'pointer', textAlign:'left',
                     display:'flex', alignItems:'center', gap:16,
                   }}>
                     <span style={{ fontSize:36 }}>🎲</span>
                     <div>
-                      <div style={{ fontSize:16, fontWeight:700, color:'#22c55e' }}>Roll Again!</div>
+                      <div style={{ fontSize:16, fontWeight:700, color:'#ec4899' }}>Roll Again!</div>
                       <div style={{ fontSize:13, color:'#555', fontFamily:'monospace', marginTop:4 }}>tap to get two new categories</div>
                     </div>
                   </button>
