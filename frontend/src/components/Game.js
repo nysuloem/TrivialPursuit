@@ -373,113 +373,91 @@ function LuckyPieAnnounce({ team, category, onDone }) {
   );
 }
 
-// ─── OPENING SCENE ────────────────────────────────────────────────────────
+// ─── OPENING SCENE ────────────────────────────────────────────────────────────────────────────
 function IntroScene({ onDone }) {
-  const [phase, setPhase] = useState('title');
-  const [visibleCats, setVisibleCats] = useState([]);
-  const [showPlay, setShowPlay] = useState(false);
+  const [phase, setPhase] = React.useState('tap'); // tap → playing → ready
+  const videoRef = React.useRef(null);
 
-  useEffect(() => {
-    const t1 = setTimeout(() => setPhase('categories'), 1800);
-    return () => clearTimeout(t1);
-  }, []);
-
-  useEffect(() => {
-    if (phase !== 'categories') return;
-    CATEGORIES.forEach((_, i) => {
-      setTimeout(() => setVisibleCats(prev => [...prev, i]), i * 250);
-    });
-    setTimeout(() => setShowPlay(true), CATEGORIES.length * 250 + 600);
+  const handleTap = React.useCallback(() => {
+    if (phase !== 'tap') return;
+    setPhase('playing');
+    const v = videoRef.current;
+    if (v) {
+      v.play().catch(() => setPhase('ready'));
+    }
   }, [phase]);
 
+  const handleEnded = React.useCallback(() => {
+    setPhase('ready');
+  }, []);
+
   return (
-    <div style={{
-      minHeight:'100vh', background:'#0a0a0a',
-      display:'flex', flexDirection:'column',
-      alignItems:'center', justifyContent:'center',
-      padding:24, gap:28, overflow:'hidden',
-    }}>
-      <style>{`
-        @keyframes titleDrop  { 0%{transform:translateY(-60px);opacity:0} 70%{transform:translateY(6px)} 100%{transform:translateY(0);opacity:1} }
-        @keyframes namePop    { 0%{transform:scale(0.5);opacity:0} 70%{transform:scale(1.1)} 100%{transform:scale(1);opacity:1} }
-        @keyframes catFall    { 0%{transform:translateY(-80px) rotate(-8deg);opacity:0} 60%{transform:translateY(6px) rotate(2deg)} 100%{transform:translateY(0) rotate(0deg);opacity:1} }
-        @keyframes pieSpin    { 0%{transform:rotate(-180deg) scale(0);opacity:0} 70%{transform:rotate(10deg) scale(1.1)} 100%{transform:rotate(0deg) scale(1);opacity:1} }
-        @keyframes playPulse  { 0%,100%{transform:scale(1);box-shadow:0 0 20px #fbbf2444} 50%{transform:scale(1.04);box-shadow:0 0 40px #fbbf2488} }
-        @keyframes subFade    { 0%{opacity:0} 100%{opacity:1} }
-        @keyframes vsGlow     { 0%,100%{opacity:0.3} 50%{opacity:0.8} }
-      `}</style>
+    <div
+      onClick={phase === 'tap' ? handleTap : undefined}
+      style={{
+        minHeight: '100vh', background: '#000',
+        display: 'flex', flexDirection: 'column',
+        alignItems: 'center', justifyContent: 'center',
+        position: 'relative', overflow: 'hidden',
+        cursor: phase === 'tap' ? 'pointer' : 'default',
+      }}
+    >
+      <style>{\`
+        @keyframes tapPulse  { 0%,100%{opacity:0.6;transform:scale(1)} 50%{opacity:1;transform:scale(1.05)} }
+        @keyframes playPulse { 0%,100%{transform:scale(1);box-shadow:0 0 20px #fbbf2444} 50%{transform:scale(1.04);box-shadow:0 0 40px #fbbf2488} }
+        @keyframes fadeIn    { 0%{opacity:0;transform:translateY(16px)} 100%{opacity:1;transform:translateY(0)} }
+      \`}</style>
 
-      {/* Main title */}
-      <div style={{ textAlign:'center', animation:'titleDrop 0.7s cubic-bezier(0.34,1.56,0.64,1) forwards' }}>
-        <div style={{ fontSize:'clamp(36px,8vw,64px)', fontWeight:900, color:'#fff', letterSpacing:-2, lineHeight:1 }}>
-          TRIVIAL PURSUIT
-        </div>
-      </div>
+      {/* Video */}
+      <video
+        ref={videoRef}
+        src="/intro.mp4"
+        onEnded={handleEnded}
+        playsInline
+        style={{
+          position: 'absolute', inset: 0,
+          width: '100%', height: '100%',
+          objectFit: 'cover',
+          opacity: phase === 'playing' ? 1 : 0,
+          transition: 'opacity 0.4s ease',
+          pointerEvents: 'none',
+        }}
+      />
 
-      {/* Family names */}
-      <div style={{
-        display:'flex', alignItems:'center', gap:12,
-        animation:'subFade 0.6s 0.4s ease both',
-      }}>
-        {['Brown', 'Rutter', 'Flower'].map((name, i) => (
-          <React.Fragment key={name}>
-            {i > 0 && (
-              <div style={{
-                fontSize:12, color:'#333', fontFamily:'monospace',
-                animation:'vsGlow 2s ease infinite',
-              }}>✦</div>
-            )}
-            <div style={{
-              fontSize:'clamp(16px,3vw,22px)', fontWeight:700,
-              color: ['#3b82f6','#ef4444','#22c55e'][i],
-              fontFamily:'Georgia,serif', letterSpacing:1,
-              animation:`namePop 0.5s ${0.5 + i * 0.15}s cubic-bezier(0.34,1.56,0.64,1) both`,
-              textShadow:`0 0 20px ${ ['#3b82f644','#ef444444','#22c55e44'][i]}`,
-            }}>
-              {name}
-            </div>
-          </React.Fragment>
-        ))}
-      </div>
-
-      {/* Category tiles */}
-      {phase === 'categories' && (
-        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:10, maxWidth:480, width:'100%' }}>
-          {CATEGORIES.map((cat, i) => (
-            <div key={cat} style={{
-              opacity: visibleCats.includes(i) ? 1 : 0,
-              animation: visibleCats.includes(i) ? 'catFall 0.5s cubic-bezier(0.34,1.56,0.64,1) forwards' : 'none',
-              background:`${CAT_COLORS[cat]}18`,
-              border:`2px solid ${CAT_COLORS[cat]}55`,
-              borderRadius:12, padding:'14px 8px',
-              textAlign:'center', display:'flex',
-              flexDirection:'column', alignItems:'center', gap:6,
-            }}>
-              <div style={{
-                fontSize:28,
-                animation: visibleCats.includes(i) ? 'pieSpin 0.6s 0.1s cubic-bezier(0.34,1.56,0.64,1) both' : 'none',
-                filter:`drop-shadow(0 0 8px ${CAT_COLORS[cat]})`,
-              }}>
-                {CAT_EMOJI[cat]}
-              </div>
-              <div style={{ fontSize:9, color:CAT_COLORS[cat], fontFamily:'monospace', fontWeight:700, letterSpacing:0.5, textAlign:'center', lineHeight:1.3 }}>
-                {cat}
-              </div>
-            </div>
-          ))}
+      {/* TAP TO START */}
+      {phase === 'tap' && (
+        <div style={{
+          display: 'flex', flexDirection: 'column',
+          alignItems: 'center', gap: 24, zIndex: 10,
+        }}>
+          <div style={{
+            fontSize: 'clamp(32px,7vw,52px)', fontWeight: 900,
+            color: '#fff', letterSpacing: -1, fontFamily: 'Georgia,serif',
+          }}>TRIVIAL PURSUIT</div>
+          <div style={{
+            fontSize: 14, color: '#fbbf24', fontFamily: 'monospace',
+            letterSpacing: 4, animation: 'tapPulse 1.5s ease infinite',
+          }}>► TAP TO START</div>
         </div>
       )}
 
-      {/* Play button */}
-      {showPlay && (
-        <button onClick={onDone} style={{
-          padding:'16px 56px', borderRadius:12, cursor:'pointer',
-          fontSize:18, fontFamily:'monospace', letterSpacing:4, fontWeight:900,
-          border:'2px solid #fbbf24', background:'#fbbf2415', color:'#fbbf24',
-          animation:'playPulse 1.5s ease infinite',
+      {/* START GAME button after video ends */}
+      {phase === 'ready' && (
+        <div style={{
+          zIndex: 10, display: 'flex', flexDirection: 'column',
+          alignItems: 'center', gap: 16,
+          animation: 'fadeIn 0.6s ease forwards',
         }}>
-          ▶ PLAY NOW
-        </button>
+          <button
+            onClick={onDone}
+            style={{
+              padding: '16px 56px', borderRadius: 12, cursor: 'pointer',
+              fontSize: 18, fontFamily: 'monospace', letterSpacing: 4, fontWeight: 900,
+              border: '2px solid #fbbf24', background: '#fbbf2415', color: '#fbbf24',
+              animation: 'playPulse 1.5s ease infinite',
+            }}
+          >► START GAME</button>
+        </div>
       )}
     </div>
   );
