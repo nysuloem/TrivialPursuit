@@ -1,7 +1,8 @@
 require('dotenv').config();
 const express = require('express');
 const cors    = require('cors');
-const { initDB } = require('./db');
+const { initDB, insertQuestions } = require('./db');
+const { ADDITIONAL_QUESTIONS } = require('./additionalQuestions');
 const { ensureDefaultAdmin } = require('./auth');
 const routes  = require('./routes');
 
@@ -32,6 +33,8 @@ app.use((err, req, res, next) => {
 async function start() {
   try {
     await initDB();
+    const added=await insertQuestions(ADDITIONAL_QUESTIONS);
+    console.log(`📚 Curated expansion pack: ${added} new questions inserted (${ADDITIONAL_QUESTIONS.length} checked)`);
     await ensureDefaultAdmin();
     app.listen(PORT, () => {
       console.log(`🚀 Trivia backend running on port ${PORT}`);
