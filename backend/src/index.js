@@ -3,6 +3,7 @@ const express = require('express');
 const cors    = require('cors');
 const { initDB, insertQuestions } = require('./db');
 const { ADDITIONAL_QUESTIONS } = require('./additionalQuestions');
+const { RECENT_QUESTIONS } = require('./recentQuestions');
 const { ensureDefaultAdmin } = require('./auth');
 const routes  = require('./routes');
 
@@ -35,6 +36,8 @@ async function start() {
     await initDB();
     const added=await insertQuestions(ADDITIONAL_QUESTIONS);
     console.log(`📚 Curated expansion pack: ${added} new questions inserted (${ADDITIONAL_QUESTIONS.length} checked)`);
+    const recentAdded=await insertQuestions(RECENT_QUESTIONS);
+    console.log(`📰 Fresh current-events pack: ${recentAdded} new questions inserted (${RECENT_QUESTIONS.length} checked)`);
     await ensureDefaultAdmin();
     app.listen(PORT, () => {
       console.log(`🚀 Trivia backend running on port ${PORT}`);
