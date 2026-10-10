@@ -2,7 +2,8 @@ const express = require('express');
 const router  = express.Router();
 const db      = require('./db');
 const { requireAuth, login } = require('./auth');
-const { checkAndRefillIfNeeded, refillBank, isRefilling } = require('./refill');
+const { refillBank, isRefilling } = require('./refill');
+const { checkCategoryTargets, getCategoryTargetStatus, isTargetRefilling } = require('./category-targets');
 
 const VALID_VOICES = ['alloy', 'echo', 'fable', 'onyx', 'nova', 'shimmer'];
 
@@ -32,7 +33,6 @@ router.post('/tts', async (req, res) => {
       speed: 0.95,
     });
 
-    // Get audio as buffer - handle both response formats
     let buffer;
     if (typeof mp3.arrayBuffer === 'function') {
       buffer = Buffer.from(await mp3.arrayBuffer());
@@ -58,8 +58,6 @@ router.post('/tts', async (req, res) => {
 
 // ── Game API ──────────────────────────────────────────────────────────────────
 
-// POST /api/game/categories — returns 2 random category options, excluding owned wedges
-// Body: { ownedCategories: [...] }
 router.post('/game/categories', async (req, res) => {
   try {
     const { ownedCategories = [] } = req.body;
@@ -68,8 +66,6 @@ router.post('/game/categories', async (req, res) => {
       return res.status(503).json({ error: 'Not enough questions in bank', bankEmpty: true });
     }
 
-    // 20% chance one of the two options is "Roll Again"
-    // Roll Again replaces the second option
     const includeRollAgain = Math.random() < 0.20;
     if (includeRollAgain && cats.length >= 1) {
       cats[1] = 'ROLL_AGAIN';
@@ -82,17 +78,13 @@ router.post('/game/categories', async (req, res) => {
   }
 });
 
-// GET /api/game/all-categories — returns all categories (for final question opponent pick)
 router.get('/game/all-categories', async (req, res) => {
   res.json({ categories: db.CATEGORIES });
 });
 
-// In-memory tracking of recent subcategories per category to avoid repeats
-const recentSubcats = {}; // { category: [subcat1, subcat2, subcat3] }
-const questionCount = {}; // { category: count } for era rotation (2 teen : 1 older)
+const recentSubcats = {};
+const questionCount = {};
 
-// POST /api/game/question — get a question for chosen category
-// Body: { category, isPie }
 router.post('/game/question', async (req, res) => {
   const { category, isPie = false } = req.body;
 
@@ -101,14 +93,11 @@ router.post('/game/question', async (req, res) => {
   }
 
   try {
-    // Era balance: 2 teen questions for every 1 older question
     if (!questionCount[category]) questionCount[category] = 0;
     const eraTarget = (questionCount[category] % 3 === 2) ? 'older' : 'teen';
     questionCount[category]++;
 
-    // Subcategory rotation: avoid last 2 subcategories
     const excludeSubcats = recentSubcats[category] || [];
-
     const question = await db.getQuestion(category, isPie, eraTarget, excludeSubcats);
     if (!question) {
       if (isPie) {
@@ -120,11 +109,10 @@ router.post('/game/question', async (req, res) => {
       return res.status(404).json({ error: 'No questions available for this category' });
     }
 
-    // Track subcategory to avoid repeating it next time
     if (question.subcategory && question.subcategory !== 'general') {
       if (!recentSubcats[category]) recentSubcats[category] = [];
       recentSubcats[category].push(question.subcategory);
-      if (recentSubcats[category].length > 2) recentSubcats[category].shift(); // keep last 2
+      if (recentSubcats[category].length > 2) recentSubcats[category].shift();
     }
 
     const pieAvailable = await db.hasPieQuestion(category);
@@ -135,8 +123,6 @@ router.post('/game/question', async (req, res) => {
   }
 });
 
-// POST /api/game/answer — mark a question as used and trigger refill check
-// Body: { questionId }
 router.post('/game/answer', async (req, res) => {
   const { questionId } = req.body;
   if (!questionId) return res.status(400).json({ error: 'questionId required' });
@@ -144,8 +130,8 @@ router.post('/game/answer', async (req, res) => {
   try {
     await db.markUsed(questionId);
 
-    // Fire-and-forget refill check
-    checkAndRefillIfNeeded().catch(console.error);
+    // Fire-and-forget category-aware refill check.
+    checkCategoryTargets().catch(console.error);
 
     const count = await db.getUnusedCount();
     res.json({ success: true, bankCount: count });
@@ -155,7 +141,6 @@ router.post('/game/answer', async (req, res) => {
   }
 });
 
-// GET /api/game/bank-count — lightweight count check
 router.get('/game/bank-count', async (req, res) => {
   try {
     const count = await db.getUnusedCount();
@@ -165,7 +150,6 @@ router.get('/game/bank-count', async (req, res) => {
   }
 });
 
-// GET /api/game/category-counts — per-category unused question counts
 router.get('/game/category-counts', async (req, res) => {
   try {
     const result = await db.pool.query(`
@@ -184,22 +168,29 @@ router.get('/game/category-counts', async (req, res) => {
   }
 });
 
+// Read-only refill status; useful from the game/admin UI and safe to expose.
+router.get('/game/category-targets', async (req, res) => {
+  try {
+    res.json(await getCategoryTargetStatus());
+  } catch (err) {
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 // ── Admin API (all protected) ─────────────────────────────────────────────────
 
-// GET /api/admin/stats
 router.get('/admin/stats', requireAuth, async (req, res) => {
   try {
     const [stats, refillLog] = await Promise.all([
       db.getBankStats(),
       db.getRefillLog(),
     ]);
-    res.json({ stats, refillLog, refilling: isRefilling() });
+    res.json({ stats, refillLog, refilling: isRefilling() || isTargetRefilling() });
   } catch (err) {
     res.status(500).json({ error: 'Server error' });
   }
 });
 
-// GET /api/admin/questions
 router.get('/admin/questions', requireAuth, async (req, res) => {
   try {
     const { page = 1, limit = 50, category, used, search, isPie } = req.query;
@@ -217,7 +208,6 @@ router.get('/admin/questions', requireAuth, async (req, res) => {
   }
 });
 
-// POST /api/admin/questions — add one question manually
 router.post('/admin/questions', requireAuth, async (req, res) => {
   const { category, question, answer, is_pie = false, canadian = false } = req.body;
   if (!category || !question || !answer) {
@@ -235,7 +225,6 @@ router.post('/admin/questions', requireAuth, async (req, res) => {
   }
 });
 
-// PUT /api/admin/questions/:id — edit a question
 router.put('/admin/questions/:id', requireAuth, async (req, res) => {
   try {
     await db.updateQuestion(parseInt(req.params.id), req.body);
@@ -245,7 +234,6 @@ router.put('/admin/questions/:id', requireAuth, async (req, res) => {
   }
 });
 
-// DELETE /api/admin/questions/:id
 router.delete('/admin/questions/:id', requireAuth, async (req, res) => {
   try {
     await db.deleteQuestion(parseInt(req.params.id));
@@ -255,16 +243,14 @@ router.delete('/admin/questions/:id', requireAuth, async (req, res) => {
   }
 });
 
-// POST /api/admin/refill — manually trigger AI refill
 router.post('/admin/refill', requireAuth, async (req, res) => {
-  if (isRefilling()) {
+  if (isRefilling() || isTargetRefilling()) {
     return res.json({ message: 'Refill already in progress' });
   }
-  refillBank().catch(console.error); // fire and forget
-  res.json({ message: 'Refill started in background' });
+  checkCategoryTargets().catch(console.error);
+  res.json({ message: 'Category-target refill started in background' });
 });
 
-// GET /api/admin/categories — list valid categories
 router.get('/admin/categories', requireAuth, async (req, res) => {
   res.json({ categories: db.CATEGORIES });
 });
