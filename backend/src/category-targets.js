@@ -15,8 +15,8 @@ const PRIORITY_ORDER = [
   'TV, Movies & Music',
   'Sports & Games',
   'Science & Nature',
-  Geography,
-  History,
+  'Geography',
+  'History',
 ];
 
 let targetRefilling = false;
@@ -110,8 +110,6 @@ async function checkCategoryTargets() {
           break;
         }
 
-        // Never deliberately exceed the target. generateBatch makes up to 10,
-        // so trim the final batch to the remaining deficit before insertion.
         const toInsert = generated.slice(0, deficit);
         const insertedRaw = await db.insertQuestions(toInsert);
         const inserted = Number.parseInt(insertedRaw, 10) || 0;
@@ -123,7 +121,6 @@ async function checkCategoryTargets() {
           `[category-targets] ${category}: inserted ${inserted}; now ${counts[category] || 0}/${target}.`
         );
 
-        // If DB duplicate protection rejected the entire batch, don't spin.
         if (inserted === 0) break;
       }
 
