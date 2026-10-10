@@ -3,8 +3,8 @@
   "version": "1.0.0",
   "main": "src/index.js",
   "scripts": {
-    "start": "node src/index.js",
-    "dev": "nodemon src/index.js",
+    "start": "node -r ./src/openai-model-router.js src/index.js",
+    "dev": "nodemon -r ./src/openai-model-router.js src/index.js",
     "seed": "node src/seed.js"
   },
   "dependencies": {
