@@ -1,14 +1,28 @@
 // Runtime compatibility layer for the trivia generator.
 //
-// The legacy generator still uses Chat Completions + web_search_preview for
-// its general web lookup step. Current GPT-6 reasoning models support web
-// search through the Responses API, not that legacy Chat Completions tool
-// shape. To improve question writing without breaking search, keep those
-// legacy search calls on OPENAI_MODEL (currently gpt-4o), while routing plain
-// generation/validation Chat Completions calls to OPENAI_GENERATION_MODEL.
-// Responses web-search calls are routed to OPENAI_NEWS_SEARCH_MODEL.
+// Legacy search calls remain on OPENAI_MODEL, while plain generation and
+// validation calls are routed to OPENAI_GENERATION_MODEL. Responses web-search
+// calls are routed to OPENAI_NEWS_SEARCH_MODEL.
 
 const originalFetch = global.fetch;
+
+const FAMILY_TRIVIA_QUALITY = `
+You are writing questions for a lively family Trivial Pursuit game, not an academic exam.
+
+QUESTION QUALITY RULES:
+- Prioritize FUN, RECOGNIZABLE, broadly knowable trivia for teens and adults playing together.
+- Difficulty mix for ordinary questions: about 45% easy, 45% medium, 10% challenging. Only explicitly labelled pie questions may be genuinely hard.
+- Avoid obscure names, minor dates, tiny statistical records, niche production credits, specialist terminology, deep-cut episode details, exact vote totals, exact scores, exact release dates, and other "you either memorized it or you don't" minutiae.
+- Ask about facts that a reasonably well-read person could know, infer, or enjoy learning.
+- Prefer famous people, major events, iconic works, widely known discoveries, landmarks, animals, inventions, teams, games, songs, films, TV shows, and cultural moments.
+- Within every generated batch, cover MANY DIFFERENT subjects. Do not write two questions about the same franchise, celebrity, team, country, war, scientific concept, game, film series, TV series, musician, or historical figure.
+- Do not reuse the same answer more than once in a category batch.
+- Avoid merely rewording a familiar trivia question. If two questions would feel like the same topic at the table, keep only one.
+- Rotate eras, regions, genres, sports, sciences, and forms of entertainment aggressively.
+- Canadian material is welcome, but do not let any one country dominate Geography, History, Sports, or Pop Culture.
+- Questions should usually be answerable in a short phrase or name.
+- Write cleanly and conversationally. The goal is "Oh, I know this!" and "That's a good question," not frustration.
+`;
 
 if (typeof originalFetch === 'function') {
   global.fetch = async function routedOpenAIFetch(input, init = {}) {
@@ -21,19 +35,23 @@ if (typeof originalFetch === 'function') {
         const body = JSON.parse(bodyText);
         let changed = false;
 
-        if (
-          url.includes('/v1/chat/completions') &&
-          !body.tools &&
-          process.env.OPENAI_GENERATION_MODEL
-        ) {
-          body.model = process.env.OPENAI_GENERATION_MODEL;
+        if (url.includes('/v1/chat/completions') && !body.tools) {
+          if (process.env.OPENAI_GENERATION_MODEL) body.model = process.env.OPENAI_GENERATION_MODEL;
+
+          // Add one consistent editorial brief to every plain question-writing /
+          // validation call. This keeps the existing generator structure while
+          // fixing the two biggest play problems: brutal difficulty and narrow,
+          // repetitive subject matter.
+          if (Array.isArray(body.messages)) {
+            body.messages = [
+              { role: 'system', content: FAMILY_TRIVIA_QUALITY },
+              ...body.messages,
+            ];
+          }
           changed = true;
         }
 
-        if (
-          url.includes('/v1/responses') &&
-          process.env.OPENAI_NEWS_SEARCH_MODEL
-        ) {
+        if (url.includes('/v1/responses') && process.env.OPENAI_NEWS_SEARCH_MODEL) {
           body.model = process.env.OPENAI_NEWS_SEARCH_MODEL;
           changed = true;
         }
@@ -58,6 +76,7 @@ if (typeof originalFetch === 'function') {
       ', news-search=' +
       (process.env.OPENAI_NEWS_SEARCH_MODEL || 'unchanged') +
       ', legacy-search=' +
-      (process.env.OPENAI_MODEL || 'gpt-4o')
+      (process.env.OPENAI_MODEL || 'gpt-4o') +
+      ', family-trivia-quality=v2'
   );
 }
