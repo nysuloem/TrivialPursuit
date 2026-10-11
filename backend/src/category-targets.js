@@ -35,7 +35,6 @@ async function getCategoryCounts() {
     WHERE used = FALSE
     GROUP BY category
   `);
-
   const counts = {};
   for (const category of db.CATEGORIES) counts[category] = 0;
   for (const row of result.rows) counts[row.category] = Number(row.count) || 0;
@@ -62,7 +61,10 @@ async function getCategoryTargetStatus() {
 async function checkCategoryTargets() {
   if (targetRefilling || isRefilling()) return;
 
-  const maxPerRun = Math.max(1, envInt('CATEGORY_REFILL_MAX_BATCHES_PER_RUN', 8));
+  // A fresh bank must become playable across ALL six colours quickly. Use at
+  // least two generation slots per category each pass, even if the old env var
+  // was set lower, then continue refilling in the background.
+  const maxPerRun = Math.max(12, envInt('CATEGORY_REFILL_MAX_BATCHES_PER_RUN', 8));
   const maxPerProcess = Math.max(maxPerRun, envInt('CATEGORY_REFILL_MAX_BATCHES_PER_PROCESS', 45));
   if (batchesThisProcess >= maxPerProcess) {
     console.log('[category-targets] process generation cap reached; leaving remaining deficits for a future deploy.');
@@ -76,26 +78,29 @@ async function checkCategoryTargets() {
 
   try {
     let counts = await getCategoryCounts();
+    const paused = new Set();
 
-    for (const category of PRIORITY_ORDER) {
-      const target = TARGETS[category] || 100;
-      let deficit = Math.max(0, target - (counts[category] || 0));
-      if (!deficit) continue;
+    // Round-robin rather than filling one category to 100 before touching the
+    // others. This gives a newly reset bank broad coverage immediately.
+    while (batchesThisRun < maxPerRun && batchesThisProcess < maxPerProcess) {
+      let didWork = false;
 
-      console.log(`[category-targets] ${category}: ${counts[category] || 0}/${target}; need ${deficit}.`);
+      for (const category of PRIORITY_ORDER) {
+        if (batchesThisRun >= maxPerRun || batchesThisProcess >= maxPerProcess) break;
+        if (paused.has(category)) continue;
 
-      while (
-        deficit > 0 &&
-        batchesThisRun < maxPerRun &&
-        batchesThisProcess < maxPerProcess
-      ) {
+        const target = TARGETS[category] || 100;
+        const deficit = Math.max(0, target - (counts[category] || 0));
+        if (!deficit) continue;
+
         batchSequence += 1;
         batchesThisRun += 1;
         batchesThisProcess += 1;
+        didWork = true;
 
         console.log(
           `[category-targets] generating ${category} batch ${batchesThisRun}/${maxPerRun} ` +
-          `(process ${batchesThisProcess}/${maxPerProcess})`
+          `(process ${batchesThisProcess}/${maxPerProcess}; ${counts[category] || 0}/${target})`
         );
 
         const generated = await generateBatch(
@@ -106,30 +111,28 @@ async function checkCategoryTargets() {
         );
 
         if (!Array.isArray(generated) || generated.length === 0) {
-          console.warn(`[category-targets] no usable ${category} questions generated; pausing this category.`);
-          break;
+          console.warn(`[category-targets] no usable ${category} questions generated; pausing this category for this pass.`);
+          paused.add(category);
+          continue;
         }
 
-        const toInsert = generated.slice(0, deficit);
-        const insertedRaw = await db.insertQuestions(toInsert);
+        const insertedRaw = await db.insertQuestions(generated.slice(0, deficit));
         const inserted = Number.parseInt(insertedRaw, 10) || 0;
-
         counts = await getCategoryCounts();
-        deficit = Math.max(0, target - (counts[category] || 0));
+        console.log(`[category-targets] ${category}: inserted ${inserted}; now ${counts[category] || 0}/${target}.`);
 
-        console.log(
-          `[category-targets] ${category}: inserted ${inserted}; now ${counts[category] || 0}/${target}.`
-        );
-
-        if (inserted === 0) break;
+        if (inserted === 0) paused.add(category);
       }
 
-      if (batchesThisRun >= maxPerRun || batchesThisProcess >= maxPerProcess) break;
+      const remaining = PRIORITY_ORDER.some(category =>
+        !paused.has(category) && (counts[category] || 0) < (TARGETS[category] || 100)
+      );
+      if (!didWork || !remaining) break;
     }
 
     const finalStatus = await getCategoryTargetStatus();
-    const remaining = Object.values(finalStatus.deficits).reduce((a, b) => a + b, 0);
-    console.log(`[category-targets] refill pass complete; ${remaining} total question slots remain below target.`);
+    const remainingSlots = Object.values(finalStatus.deficits).reduce((a, b) => a + b, 0);
+    console.log(`[category-targets] refill pass complete; ${remainingSlots} total question slots remain below target.`);
   } catch (err) {
     console.error('[category-targets] refill pass failed:', err.message);
   } finally {
