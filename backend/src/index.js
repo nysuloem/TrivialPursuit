@@ -46,9 +46,6 @@ async function retireOldBankOnce() {
 }
 
 async function installRepeatGuard() {
-  // Never serve meta-trivia about Trivial Pursuit itself. Retire anything already
-  // generated, including clues whose answer is Trivial Pursuit and clues that name
-  // the game while asking about its creators, history, pieces, editions, etc.
   const retiredMeta = await db.pool.query(`
     UPDATE questions
     SET used=TRUE, used_at=COALESCE(used_at, NOW())
@@ -92,12 +89,16 @@ async function start() {
     await initDB();
     const reset = await retireOldBankOnce();
     await installRepeatGuard();
+
+    // Build a permanent semantic topic ledger from every historical question,
+    // including retired/used ones, before generating anything new. New questions
+    // are rejected if they are too close in meaning to any prior question.
+    await db.backfillThemeEmbeddings();
+
     if (reset.applied) {
       console.log(`🧹 Retired ${reset.retired} old trivia questions; rebuilding a fresh bank from the API model.`);
     }
 
-    // Do not reinsert the legacy hard-coded question packs. From this reset
-    // forward, playable questions come from the fresh generator/refill system.
     await ensureDefaultAdmin();
     app.listen(PORT, async () => {
       console.log(`🚀 Trivia backend running on port ${PORT}`);
