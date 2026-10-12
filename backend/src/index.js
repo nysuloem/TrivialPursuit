@@ -46,10 +46,27 @@ async function retireOldBankOnce() {
 }
 
 async function installRepeatGuard() {
+  // Never serve meta-trivia about Trivial Pursuit itself. Retire anything already
+  // generated, including clues whose answer is Trivial Pursuit and clues that name
+  // the game while asking about its creators, history, pieces, editions, etc.
+  const retiredMeta = await db.pool.query(`
+    UPDATE questions
+    SET used=TRUE, used_at=COALESCE(used_at, NOW())
+    WHERE used=FALSE
+      AND (question ILIKE '%trivial pursuit%' OR answer ILIKE '%trivial pursuit%')
+    RETURNING id
+  `);
+  if (retiredMeta.rowCount) {
+    console.log(`[question-ban] retired ${retiredMeta.rowCount} Trivial Pursuit meta-question(s).`);
+  }
+
   await db.pool.query(`
     CREATE OR REPLACE FUNCTION tp_prevent_repeat_category_answer()
     RETURNS trigger AS $$
     BEGIN
+      IF NEW.question ILIKE '%trivial pursuit%' OR NEW.answer ILIKE '%trivial pursuit%' THEN
+        RETURN NULL;
+      END IF;
       IF EXISTS (
         SELECT 1 FROM questions
         WHERE used = FALSE
