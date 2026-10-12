@@ -14,6 +14,37 @@ const CATEGORIES = [
   'Pop Culture & Current Events',
 ];
 
+const EMBEDDING_MODEL = process.env.OPENAI_EMBEDDING_MODEL || 'text-embedding-3-small';
+const THEME_SIMILARITY_THRESHOLD = Number.parseFloat(process.env.THEME_SIMILARITY_THRESHOLD || '0.80');
+
+async function embedTexts(texts) {
+  if (!texts.length) return [];
+  if (!process.env.OPENAI_API_KEY) throw new Error('OPENAI_API_KEY is required for semantic theme deduplication');
+  const response = await fetch('https://api.openai.com/v1/embeddings', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ model: EMBEDDING_MODEL, input: texts }),
+  });
+  if (!response.ok) throw new Error(`Embedding request failed (${response.status}): ${await response.text()}`);
+  const data = await response.json();
+  return (data.data || []).sort((a, b) => a.index - b.index).map(item => item.embedding);
+}
+
+function cosineSimilarity(a, b) {
+  if (!Array.isArray(a) || !Array.isArray(b) || a.length !== b.length || !a.length) return 0;
+  let dot = 0, aa = 0, bb = 0;
+  for (let i = 0; i < a.length; i++) {
+    dot += a[i] * b[i];
+    aa += a[i] * a[i];
+    bb += b[i] * b[i];
+  }
+  if (!aa || !bb) return 0;
+  return dot / (Math.sqrt(aa) * Math.sqrt(bb));
+}
+
 // ── Schema ────────────────────────────────────────────────────────────────────
 async function initDB() {
   const client = await pool.connect();
@@ -52,13 +83,12 @@ async function initDB() {
     await client.query(`CREATE INDEX IF NOT EXISTS idx_q_used ON questions(used)`);
     await client.query(`CREATE INDEX IF NOT EXISTS idx_q_pie ON questions(is_pie, used)`);
 
-    // Add subcategory and era columns if they don't exist
     await client.query(`ALTER TABLE questions ADD COLUMN IF NOT EXISTS subcategory TEXT DEFAULT 'general'`);
     await client.query(`ALTER TABLE questions ADD COLUMN IF NOT EXISTS era TEXT DEFAULT 'millennial'`);
+    await client.query(`ALTER TABLE questions ADD COLUMN IF NOT EXISTS theme_embedding REAL[]`);
     await client.query(`CREATE INDEX IF NOT EXISTS idx_q_subcat ON questions(category, subcategory, used)`);
     await client.query(`CREATE INDEX IF NOT EXISTS idx_q_era ON questions(category, era, used)`);
 
-    // Clean up any existing duplicates FIRST (keep lowest id)
     await client.query(`
       DELETE FROM questions
       WHERE id NOT IN (
@@ -66,9 +96,8 @@ async function initDB() {
       )
     `);
 
-    // Now safe to create unique index
     await client.query(`
-      CREATE UNIQUE INDEX IF NOT EXISTS idx_q_unique_question 
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_q_unique_question
       ON questions(LOWER(question))
     `);
 
@@ -78,13 +107,48 @@ async function initDB() {
   }
 }
 
+async function backfillThemeEmbeddings() {
+  const missing = await pool.query(`
+    SELECT id, question FROM questions
+    WHERE theme_embedding IS NULL
+    ORDER BY id
+  `);
+  if (!missing.rows.length) {
+    console.log('[theme-dedupe] semantic ledger already complete.');
+    return 0;
+  }
+
+  let updated = 0;
+  const batchSize = 100;
+  for (let i = 0; i < missing.rows.length; i += batchSize) {
+    const batch = missing.rows.slice(i, i + batchSize);
+    const vectors = await embedTexts(batch.map(row => row.question));
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      for (let j = 0; j < batch.length; j++) {
+        if (!vectors[j]) continue;
+        await client.query('UPDATE questions SET theme_embedding=$1 WHERE id=$2', [vectors[j], batch[j].id]);
+        updated += 1;
+      }
+      await client.query('COMMIT');
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+  console.log(`[theme-dedupe] embedded ${updated} historical questions for permanent theme memory.`);
+  return updated;
+}
+
 // ── Stats ─────────────────────────────────────────────────────────────────────
 async function getUnusedCount() {
   const r = await pool.query('SELECT COUNT(*) FROM questions WHERE used = FALSE');
   return parseInt(r.rows[0].count);
 }
 
-// Returns categories that have fewer than MIN_PER_CATEGORY unused questions
 const MIN_PER_CATEGORY = 50;
 async function getLowCategories() {
   const r = await pool.query(`
@@ -93,7 +157,7 @@ async function getLowCategories() {
     GROUP BY category
     HAVING COUNT(*) FILTER (WHERE used = FALSE) < $1
   `, [MIN_PER_CATEGORY]);
-  return r.rows; // [{ category, available }]
+  return r.rows;
 }
 
 async function getBankStats() {
@@ -113,8 +177,6 @@ async function getBankStats() {
 }
 
 // ── Game queries ──────────────────────────────────────────────────────────────
-
-// Returns 2 random category names that have available questions, excluding owned wedge categories
 async function getTwoCategoryOptions(ownedCategories = []) {
   const r = await pool.query(`
     SELECT category
@@ -127,7 +189,6 @@ async function getTwoCategoryOptions(ownedCategories = []) {
     LIMIT 2
   `, [ownedCategories.length > 0 ? ownedCategories : null]);
 
-  // If not enough categories after exclusion, fall back without exclusion
   if (r.rows.length < 2) {
     const fallback = await pool.query(`
       SELECT category
@@ -143,21 +204,13 @@ async function getTwoCategoryOptions(ownedCategories = []) {
   return r.rows.map(row => row.category);
 }
 
-// Pull a single unused question with era balance and subcategory rotation
-// eraTarget: 'teen' | 'older' | null (null = no preference)
-// excludeSubcats: array of recent subcategories to avoid
 async function getQuestion(category, isPie = false, eraTarget = null, excludeSubcats = []) {
-  // Build era clause
   let eraClause = '';
   let params = [category, isPie];
-  
-  if (eraTarget === 'teen') {
-    eraClause = "AND era = 'teen'";
-  } else if (eraTarget === 'older') {
-    eraClause = "AND era != 'teen'";
-  }
 
-  // Build subcategory exclusion clause
+  if (eraTarget === 'teen') eraClause = "AND era = 'teen'";
+  else if (eraTarget === 'older') eraClause = "AND era != 'teen'";
+
   let subcatClause = '';
   if (excludeSubcats.length > 0) {
     subcatClause = `AND subcategory != ALL($${params.length + 1}::text[])`;
@@ -176,7 +229,6 @@ async function getQuestion(category, isPie = false, eraTarget = null, excludeSub
     LIMIT 1
   `, params);
 
-  // Fallback: if no match with constraints, try without subcategory restriction
   if (!r.rows[0] && excludeSubcats.length > 0) {
     const fallback = await pool.query(`
       SELECT id, category, question, answer, is_pie, canadian, subcategory, era
@@ -191,7 +243,6 @@ async function getQuestion(category, isPie = false, eraTarget = null, excludeSub
     if (fallback.rows[0]) return fallback.rows[0];
   }
 
-  // Final fallback: no era constraint
   if (!r.rows[0]) {
     const final = await pool.query(`
       SELECT id, category, question, answer, is_pie, canadian, subcategory, era
@@ -208,7 +259,6 @@ async function getQuestion(category, isPie = false, eraTarget = null, excludeSub
   return r.rows[0];
 }
 
-// Mark question as used (permanently consumed)
 async function markUsed(questionId) {
   await pool.query(
     'UPDATE questions SET used = TRUE, used_at = NOW() WHERE id = $1',
@@ -216,7 +266,6 @@ async function markUsed(questionId) {
   );
 }
 
-// Check whether a pie question is available for this category
 async function hasPieQuestion(category) {
   const r = await pool.query(
     'SELECT 1 FROM questions WHERE category=$1 AND is_pie=TRUE AND used=FALSE LIMIT 1',
@@ -243,12 +292,12 @@ async function listQuestions({ page = 1, limit = 50, category, used, search, isP
   const params = [];
   let i = 1;
 
-  if (category)          { conditions.push(`category = $${i++}`);               params.push(category); }
-  if (used !== undefined) { conditions.push(`used = $${i++}`);                   params.push(used); }
-  if (isPie !== undefined){ conditions.push(`is_pie = $${i++}`);                 params.push(isPie); }
-  if (search)            { conditions.push(`(question ILIKE $${i} OR answer ILIKE $${i})`); params.push(`%${search}%`); i++; }
+  if (category)           { conditions.push(`category = $${i++}`); params.push(category); }
+  if (used !== undefined) { conditions.push(`used = $${i++}`); params.push(used); }
+  if (isPie !== undefined){ conditions.push(`is_pie = $${i++}`); params.push(isPie); }
+  if (search)             { conditions.push(`(question ILIKE $${i} OR answer ILIKE $${i})`); params.push(`%${search}%`); i++; }
 
-  const where  = conditions.length ? 'WHERE ' + conditions.join(' AND ') : '';
+  const where = conditions.length ? 'WHERE ' + conditions.join(' AND ') : '';
   const offset = (page - 1) * limit;
 
   const [rows, countRow] = await Promise.all([
@@ -257,8 +306,8 @@ async function listQuestions({ page = 1, limit = 50, category, used, search, isP
   ]);
 
   return {
-    questions:  rows.rows,
-    total:      parseInt(countRow.rows[0].count),
+    questions: rows.rows,
+    total: parseInt(countRow.rows[0].count),
     page,
     totalPages: Math.ceil(parseInt(countRow.rows[0].count) / limit),
   };
@@ -266,19 +315,55 @@ async function listQuestions({ page = 1, limit = 50, category, used, search, isP
 
 async function insertQuestions(questions) {
   if (!questions.length) return 0;
+
+  // Theme-level duplicate protection: compare every proposed question to the
+  // permanent semantic ledger, including already-used/retired questions. This
+  // prevents a topic from returning through a different angle or answer.
+  const vectors = await embedTexts(questions.map(q => q.question));
+  const existingRows = await pool.query(`
+    SELECT id, question, theme_embedding
+    FROM questions
+    WHERE theme_embedding IS NOT NULL
+  `);
+  const semanticLedger = existingRows.rows
+    .filter(row => Array.isArray(row.theme_embedding))
+    .map(row => ({ id: row.id, question: row.question, vector: row.theme_embedding.map(Number) }));
+
   const client = await pool.connect();
   let inserted = 0;
   try {
     await client.query('BEGIN');
-    for (const q of questions) {
+    for (let i = 0; i < questions.length; i++) {
+      const q = questions[i];
+      const vector = vectors[i];
+      if (!vector) {
+        console.warn('[theme-dedupe] rejected question because no semantic embedding was returned.');
+        continue;
+      }
+
+      let best = null;
+      for (const prior of semanticLedger) {
+        const similarity = cosineSimilarity(vector, prior.vector);
+        if (!best || similarity > best.similarity) best = { ...prior, similarity };
+      }
+
+      if (best && best.similarity >= THEME_SIMILARITY_THRESHOLD) {
+        console.log(
+          `[theme-dedupe] rejected repeated theme (${best.similarity.toFixed(3)}): ` +
+          `"${q.question}" ~ "${best.question}"`
+        );
+        continue;
+      }
+
       const r = await client.query(
-        `INSERT INTO questions (category, question, answer, is_pie, canadian, subcategory, era)
-         VALUES ($1, $2, $3, $4, $5, $6, $7)
+        `INSERT INTO questions (category, question, answer, is_pie, canadian, subcategory, era, theme_embedding)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
          ON CONFLICT (LOWER(question)) DO NOTHING`,
         [q.category, q.question, q.answer, q.is_pie || false, q.canadian || false,
-         q.subcategory || 'untagged', q.era || 'millennial']
+         q.subcategory || 'untagged', q.era || 'millennial', vector]
       );
       inserted += r.rowCount;
+      if (r.rowCount) semanticLedger.push({ id: null, question: q.question, vector });
     }
     await client.query('COMMIT');
     return inserted;
@@ -297,7 +382,7 @@ async function deleteQuestion(id) {
 async function updateQuestion(id, fields) {
   const { question, answer, category, is_pie, canadian } = fields;
   await pool.query(
-    `UPDATE questions SET question=$1, answer=$2, category=$3, is_pie=$4, canadian=$5 WHERE id=$6`,
+    `UPDATE questions SET question=$1, answer=$2, category=$3, is_pie=$4, canadian=$5, theme_embedding=NULL WHERE id=$6`,
     [question, answer, category, is_pie, canadian, id]
   );
 }
@@ -315,7 +400,7 @@ async function getRefillLog() {
 }
 
 module.exports = {
-  pool, initDB, CATEGORIES,
+  pool, initDB, backfillThemeEmbeddings, CATEGORIES,
   getUnusedCount, getBankStats, getLowCategories,
   getTwoCategoryOptions, getQuestion, markUsed, hasPieQuestion,
   getAdminByUsername, createAdmin,
