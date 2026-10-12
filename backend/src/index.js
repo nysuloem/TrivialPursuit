@@ -9,7 +9,7 @@ const routes  = require('./routes');
 
 const app  = express();
 const PORT = process.env.PORT || 3001;
-const FRESH_BANK_RESET_TAG = 'fresh-bank-v2-2026-10-11';
+const FRESH_BANK_RESET_TAG = 'fresh-bank-v3-2026-10-11-post-diversity-reset';
 
 app.use(cors({ origin: process.env.FRONTEND_URL || '*', credentials: true }));
 app.use(express.json());
