@@ -8,17 +8,15 @@ const fs = require('node:fs');
 const path = require('node:path');
 const originalFetch = global.fetch;
 
-// Patch the legacy refill generator before index.js requires it. The previous
-// History scaffold was much too narrow (World Wars / Cold War / US civil-rights
-// heavy) and the duplicate detector still allowed the same answer/topic to come
-// back with reworded clues. Keep the existing DB history, but use it as a true
-// "do not revisit this topic" ledger for non-generic answers.
+// Patch the legacy refill generator before index.js requires it. Keep the old
+// question DB as a "do not repeat" ledger, but deliberately widen the topic map
+// used to discover new material.
 try {
   const refillPath = path.join(__dirname, 'refill.js');
   let source = fs.readFileSync(refillPath, 'utf8');
 
   const oldHistoryPlan = `  History: [\n    { subcategory: 'world_wars', count: 2 },\n    { subcategory: 'cold_war', count: 1 },\n    { subcategory: 'civil_rights', count: 1 },\n    { subcategory: 'exploration', count: 1 },\n    { subcategory: 'ancient', count: 1 },\n    { subcategory: 'medieval', count: 1 },\n    { subcategory: 'modern', count: 1 },\n  ],`;
-  const newHistoryPlan = `  History: [\n    // History should feel global, not like a US/World-Wars category. Modern is\n    // deliberately the largest bucket because its angles now span Canada and\n    // multiple world regions. World Wars are capped at one slot per batch.\n    { subcategory: 'modern', count: 3 },\n    { subcategory: 'ancient', count: 1 },\n    { subcategory: 'medieval', count: 1 },\n    { subcategory: 'exploration', count: 1 },\n    { subcategory: 'cold_war', count: 1 },\n    { subcategory: 'civil_rights', count: 1 },\n    { subcategory: 'world_wars', count: 1 },\n  ],`;
+  const newHistoryPlan = `  History: [\n    { subcategory: 'modern', count: 3 },\n    { subcategory: 'ancient', count: 1 },\n    { subcategory: 'medieval', count: 1 },\n    { subcategory: 'exploration', count: 1 },\n    { subcategory: 'cold_war', count: 1 },\n    { subcategory: 'civil_rights', count: 1 },\n    { subcategory: 'world_wars', count: 1 },\n  ],`;
 
   const oldModernAngles = `    modern: [\n      'famous_firsts',\n      'inventions',\n      'scandals',\n      'turning_points',\n      'leaders',\n      'cold_war_era',\n      'social_movements',\n    ],`;
   const newModernAngles = `    modern: [\n      'canadian_confederation_and_government',\n      'indigenous_canadian_history',\n      'canadian_social_and_cultural_history',\n      'canadian_inventions_and_firsts',\n      'political_history_canada',\n      'political_history_world',\n      'elections_parties_and_parliaments',\n      'constitutions_treaties_and_reforms',\n      'europe_beyond_the_world_wars',\n      'african_history_and_decolonization',\n      'asian_history',\n      'latin_american_history',\n      'middle_eastern_history',\n      'revolutions_and_independence',\n      'women_in_history',\n      'labour_and_social_movements',\n      'science_invention_and_daily_life',\n      'brands_products_and_advertising_history',\n      'retail_and_consumer_history',\n      'obsolete_technology_and_household_products',\n      'political_turning_points',\n    ],`;
@@ -27,15 +25,33 @@ try {
   const newHistorySearch = `  if (slot.category === 'History') {\n    return [\n      eraText,\n      guidance,\n      'history trivia up to year 2000 only — no events after 2000',\n      'use a genuinely global range: Canadian history, Indigenous history in Canada, political history, elections and governments, constitutions and reforms, Europe beyond the world wars, Africa, Asia, Latin America, the Middle East, ancient civilizations, medieval societies, exploration, independence movements, revolutions, political and social change, inventions and everyday life',\n      'include consumer and everyday-life history too: famous old brands, discontinued products, department stores, advertising slogans, household technology, toys, cars, food brands, retail chains, packaging and products people remember from earlier decades',\n      'American history may appear, but it must not dominate; World War I and World War II together should be a small minority of History questions',\n      'prefer different countries, centuries, peoples, movements and kinds of history from one question to the next',\n      'accessible family trivia recognizable to Canadian players',\n    ].filter(Boolean).join(' ');\n  }`;
 
   const oldDuplicateRule = `    if (sameAnswer && !isBroadReusableAnswer(newAnswer) && wordingSimilarity >= 0.45) return true;`;
-  const newDuplicateRule = `    // If a distinctive answer has ever appeared in this category, retire that\n    // answer/topic entirely rather than allowing a cosmetically reworded clue.\n    if (sameAnswer && !isBroadReusableAnswer(newAnswer)) return true;`;
+  const newDuplicateRule = `    if (sameAnswer && !isBroadReusableAnswer(newAnswer)) return true;`;
+
+  // Pop culture had accidentally become an internet-trends category. Create
+  // explicit non-internet lanes so the generator has to look elsewhere.
+  const oldPopSubcats = `  'Pop Culture & Current Events': [\n    'current_events',\n    'sports_news',\n    'internet_culture',\n    'celebrity_lifestyle',\n    'teen_culture',\n    'viral',\n  ],`;
+  const newPopSubcats = `  'Pop Culture & Current Events': [\n    'current_events',\n    'sports_news',\n    'internet_culture',\n    'celebrity_lifestyle',\n    'teen_culture',\n    'viral',\n    'brands_and_products',\n    'fashion_and_fads',\n    'toys_and_collectibles',\n    'food_and_consumer_culture',\n    'books_magazines_and_comics',\n    'advertising_and_slogans',\n  ],`;
+
+  const oldPopPlan = `  'Pop Culture & Current Events': [\n    { subcategory: 'current_events', count: 3 },\n    { subcategory: 'sports_news', count: 1 },\n    { subcategory: 'internet_culture', count: 2 },\n    { subcategory: 'teen_culture', count: 1 },\n    { subcategory: 'celebrity_lifestyle', count: 1 },\n    { subcategory: 'viral', count: 2 },\n  ],`;
+  const newPopPlan = `  'Pop Culture & Current Events': [\n    { subcategory: 'current_events', count: 2 },\n    { subcategory: 'sports_news', count: 1 },\n    { subcategory: 'internet_culture', count: 1 },\n    { subcategory: 'celebrity_lifestyle', count: 1 },\n    { subcategory: 'brands_and_products', count: 1 },\n    { subcategory: 'fashion_and_fads', count: 1 },\n    { subcategory: 'toys_and_collectibles', count: 1 },\n    { subcategory: 'food_and_consumer_culture', count: 1 },\n    { subcategory: 'books_magazines_and_comics', count: 1 },\n  ],`;
+
+  const popAnglesAnchor = `    viral: [\n      'memes',\n      'internet_challenges',\n      'viral_videos',\n      'social_media_moments',\n      'internet_phrases',\n      'widely_known_online_moments',\n    ],\n  },`;
+  const popAnglesReplacement = `    viral: [\n      'memes',\n      'internet_challenges',\n      'viral_videos',\n      'social_media_moments',\n      'internet_phrases',\n      'widely_known_online_moments',\n    ],\n    brands_and_products: [\n      'famous_brand_launches', 'discontinued_products', 'product_design', 'retail_culture',\n      'consumer_technology', 'iconic_packaging', 'canadian_brands', 'product_crazes'\n    ],\n    fashion_and_fads: [\n      'fashion_trends', 'hairstyles', 'footwear', 'accessories', 'dance_crazes',\n      'fitness_fads', 'decade_specific_fads', 'canadian_fashion'\n    ],\n    toys_and_collectibles: [\n      'classic_toys', 'toy_crazes', 'collectibles', 'trading_cards', 'dolls_and_figures',\n      'holiday_toys', 'canadian_toys', 'playground_crazes'\n    ],\n    food_and_consumer_culture: [\n      'snacks_and_candy', 'fast_food_history', 'soft_drinks', 'breakfast_cereals',\n      'restaurant_chains', 'food_fads', 'canadian_food_brands', 'product_mascots'\n    ],\n    books_magazines_and_comics: [\n      'bestselling_books', 'comic_strips', 'comic_books', 'magazines', 'book_crazes',\n      'young_adult_books', 'newspaper_culture', 'canadian_publishing'\n    ],\n    advertising_and_slogans: [\n      'famous_slogans', 'commercial_characters', 'ad_campaigns', 'jingles_without_lyrics',\n      'brand_mascots', 'public_service_ads', 'canadian_advertising'\n    ],\n  },`;
+
+  const oldTvAngles = `    tv_show: [\n      'sitcoms',\n      'dramas',\n      'streaming_hits',\n      'classic_tv',\n      'reality_tv',\n      'animated_tv',\n      'tv_catchphrases',\n      'series_finales',\n      'spinoffs',\n      'award_winners',\n    ],`;
+  const newTvAngles = `    tv_show: [\n      'canadian_tv', 'british_tv', 'international_tv', 'game_shows', 'talk_and_late_night',\n      'documentaries', 'kids_and_family_tv', 'animation', 'science_fiction_tv', 'crime_and_mystery_tv',\n      'sitcoms_1950s_to_1970s', 'sitcoms_1980s_to_1990s', 'sitcoms_2000s_to_2020s',\n      'prestige_drama', 'soap_operas', 'reality_competitions', 'variety_shows', 'miniseries',\n      'tv_network_history', 'famous_tv_sets_and_props', 'tv_characters', 'tv_hosts', 'cult_tv'\n    ],`;
 
   if (source.includes(oldHistoryPlan)) source = source.replace(oldHistoryPlan, newHistoryPlan);
   if (source.includes(oldModernAngles)) source = source.replace(oldModernAngles, newModernAngles);
   if (source.includes(oldHistorySearch)) source = source.replace(oldHistorySearch, newHistorySearch);
   if (source.includes(oldDuplicateRule)) source = source.replace(oldDuplicateRule, newDuplicateRule);
+  if (source.includes(oldPopSubcats)) source = source.replace(oldPopSubcats, newPopSubcats);
+  if (source.includes(oldPopPlan)) source = source.replace(oldPopPlan, newPopPlan);
+  if (source.includes(popAnglesAnchor)) source = source.replace(popAnglesAnchor, popAnglesReplacement);
+  if (source.includes(oldTvAngles)) source = source.replace(oldTvAngles, newTvAngles);
 
   fs.writeFileSync(refillPath, source, 'utf8');
-  console.log('[trivia-diversity] broadened History toward Canada + world politics + consumer history; repeated distinctive answers retired across the full DB history');
+  console.log('[trivia-diversity] broadened History, Pop Culture, and TV topic maps; internet trends capped; repeated distinctive answers retired');
 } catch (error) {
   console.warn('[trivia-diversity] runtime refill patch skipped:', error.message || error);
 }
@@ -56,7 +72,9 @@ QUESTION QUALITY RULES:
 - Rotate eras, regions, genres, sports, sciences, and forms of entertainment aggressively.
 - Canadian material is welcome, but do not let any one country dominate Geography, History, Sports, or Pop Culture.
 - For HISTORY specifically: strongly diversify across Canadian history, Indigenous history in Canada, political history, elections, parties, parliaments, constitutions, treaties, reforms, Europe outside the World Wars, Africa, Asia, Latin America, the Middle East, ancient civilizations, medieval societies, independence movements, revolutions, social history, inventions, and everyday life. US history and the World Wars must be a minority, not the default.
-- HISTORY should also include consumer memory and material culture: old or discontinued brands and products, department stores and retail chains, famous advertising, household gadgets, toys, cars, food products, packaging, and technologies associated with earlier decades. These should be recognizable and fun, not obscure corporate trivia.
+- HISTORY should also include consumer memory and material culture: old or discontinued brands and products, department stores and retail chains, famous advertising, household gadgets, toys, cars, food products, packaging, and technologies associated with earlier decades.
+- POP CULTURE is much broader than internet culture. In a typical batch, internet memes/social-media/viral trends together must be a small minority. Deliberately include brands and products, toys and collectibles, fashion and fads, food and consumer culture, books/magazines/comics, advertising, celebrity culture, major current events, and sports headlines.
+- TV questions must range across decades, countries, formats and genres. Do not repeatedly return to the same handful of famous sitcoms or streaming franchises. Canadian, British and international television, game shows, documentaries, animation, family TV, reality competitions, dramas, soaps, sci-fi, crime, talk/late-night and classic television should all appear over time.
 - Political-history questions should focus on significant leaders, elections, parties, governments, laws, institutions, scandals, constitutional changes and turning points that a general audience could plausibly know; avoid microscopic vote counts and procedural minutiae.
 - Questions should usually be answerable in a short phrase or name.
 - Write cleanly and conversationally. The goal is "Oh, I know this!" and "That's a good question," not frustration.
@@ -110,6 +128,6 @@ if (typeof originalFetch === 'function') {
       (process.env.OPENAI_NEWS_SEARCH_MODEL || 'unchanged') +
       ', legacy-search=' +
       (process.env.OPENAI_MODEL || 'gpt-4o') +
-      ', family-trivia-quality=v4'
+      ', family-trivia-quality=v5'
   );
 }
