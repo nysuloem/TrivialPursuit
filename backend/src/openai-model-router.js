@@ -4,7 +4,41 @@
 // validation calls are routed to OPENAI_GENERATION_MODEL. Responses web-search
 // calls are routed to OPENAI_NEWS_SEARCH_MODEL.
 
+const fs = require('node:fs');
+const path = require('node:path');
 const originalFetch = global.fetch;
+
+// Patch the legacy refill generator before index.js requires it. The previous
+// History scaffold was much too narrow (World Wars / Cold War / US civil-rights
+// heavy) and the duplicate detector still allowed the same answer/topic to come
+// back with reworded clues. Keep the existing DB history, but use it as a true
+// "do not revisit this topic" ledger for non-generic answers.
+try {
+  const refillPath = path.join(__dirname, 'refill.js');
+  let source = fs.readFileSync(refillPath, 'utf8');
+
+  const oldHistoryPlan = `  History: [\n    { subcategory: 'world_wars', count: 2 },\n    { subcategory: 'cold_war', count: 1 },\n    { subcategory: 'civil_rights', count: 1 },\n    { subcategory: 'exploration', count: 1 },\n    { subcategory: 'ancient', count: 1 },\n    { subcategory: 'medieval', count: 1 },\n    { subcategory: 'modern', count: 1 },\n  ],`;
+  const newHistoryPlan = `  History: [\n    // History should feel global, not like a US/World-Wars category. Modern is\n    // deliberately the largest bucket because its angles now span Canada and\n    // multiple world regions. World Wars are capped at one slot per batch.\n    { subcategory: 'modern', count: 3 },\n    { subcategory: 'ancient', count: 1 },\n    { subcategory: 'medieval', count: 1 },\n    { subcategory: 'exploration', count: 1 },\n    { subcategory: 'cold_war', count: 1 },\n    { subcategory: 'civil_rights', count: 1 },\n    { subcategory: 'world_wars', count: 1 },\n  ],`;
+
+  const oldModernAngles = `    modern: [\n      'famous_firsts',\n      'inventions',\n      'scandals',\n      'turning_points',\n      'leaders',\n      'cold_war_era',\n      'social_movements',\n    ],`;
+  const newModernAngles = `    modern: [\n      'canadian_confederation_and_government',\n      'indigenous_canadian_history',\n      'canadian_social_and_cultural_history',\n      'canadian_inventions_and_firsts',\n      'europe_beyond_the_world_wars',\n      'african_history_and_decolonization',\n      'asian_history',\n      'latin_american_history',\n      'middle_eastern_history',\n      'revolutions_and_independence',\n      'women_in_history',\n      'labour_and_social_movements',\n      'science_invention_and_daily_life',\n      'political_turning_points',\n    ],`;
+
+  const oldHistorySearch = `  if (slot.category === 'History') {\n    return [\n      eraText,\n      guidance,\n      'history trivia up to year 2000 only — no events after 2000',\n      'focus on events before year 2000: ancient history, medieval, age of exploration, world wars, cold war, civil rights movements, 1980s 1990s history',\n      'accessible family trivia recognizable North America',\n    ].filter(Boolean).join(' ');\n  }`;
+  const newHistorySearch = `  if (slot.category === 'History') {\n    return [\n      eraText,\n      guidance,\n      'history trivia up to year 2000 only — no events after 2000',\n      'use a genuinely global range: Canadian history, Indigenous history in Canada, Europe beyond the world wars, Africa, Asia, Latin America, the Middle East, ancient civilizations, medieval societies, exploration, independence movements, revolutions, political and social change, inventions and everyday life',\n      'American history may appear, but it must not dominate; World War I and World War II together should be a small minority of History questions',\n      'prefer different countries, centuries, peoples, movements and kinds of history from one question to the next',\n      'accessible family trivia recognizable to Canadian players',\n    ].filter(Boolean).join(' ');\n  }`;
+
+  const oldDuplicateRule = `    if (sameAnswer && !isBroadReusableAnswer(newAnswer) && wordingSimilarity >= 0.45) return true;`;
+  const newDuplicateRule = `    // If a distinctive answer has ever appeared in this category, retire that\n    // answer/topic entirely rather than allowing a cosmetically reworded clue.\n    if (sameAnswer && !isBroadReusableAnswer(newAnswer)) return true;`;
+
+  if (source.includes(oldHistoryPlan)) source = source.replace(oldHistoryPlan, newHistoryPlan);
+  if (source.includes(oldModernAngles)) source = source.replace(oldModernAngles, newModernAngles);
+  if (source.includes(oldHistorySearch)) source = source.replace(oldHistorySearch, newHistorySearch);
+  if (source.includes(oldDuplicateRule)) source = source.replace(oldDuplicateRule, newDuplicateRule);
+
+  fs.writeFileSync(refillPath, source, 'utf8');
+  console.log('[trivia-diversity] broadened History toward Canada + world history; repeated distinctive answers retired across the full DB history');
+} catch (error) {
+  console.warn('[trivia-diversity] runtime refill patch skipped:', error.message || error);
+}
 
 const FAMILY_TRIVIA_QUALITY = `
 You are writing questions for a lively family Trivial Pursuit game, not an academic exam.
@@ -18,8 +52,10 @@ QUESTION QUALITY RULES:
 - Within every generated batch, cover MANY DIFFERENT subjects. Do not write two questions about the same franchise, celebrity, team, country, war, scientific concept, game, film series, TV series, musician, or historical figure.
 - Do not reuse the same answer more than once in a category batch.
 - Avoid merely rewording a familiar trivia question. If two questions would feel like the same topic at the table, keep only one.
+- The examples and famous names in any search guidance are ILLUSTRATIONS, not preferred answers. Deliberately range beyond them instead of repeatedly choosing the most obvious examples.
 - Rotate eras, regions, genres, sports, sciences, and forms of entertainment aggressively.
 - Canadian material is welcome, but do not let any one country dominate Geography, History, Sports, or Pop Culture.
+- For HISTORY specifically: strongly diversify across Canadian history, Indigenous history in Canada, Europe outside the World Wars, Africa, Asia, Latin America, the Middle East, ancient civilizations, medieval societies, independence movements, revolutions, social history, inventions, and everyday life. US history and the World Wars must be a minority, not the default.
 - Questions should usually be answerable in a short phrase or name.
 - Write cleanly and conversationally. The goal is "Oh, I know this!" and "That's a good question," not frustration.
 `;
@@ -37,11 +73,6 @@ if (typeof originalFetch === 'function') {
 
         if (url.includes('/v1/chat/completions') && !body.tools) {
           if (process.env.OPENAI_GENERATION_MODEL) body.model = process.env.OPENAI_GENERATION_MODEL;
-
-          // Add one consistent editorial brief to every plain question-writing /
-          // validation call. This keeps the existing generator structure while
-          // fixing the two biggest play problems: brutal difficulty and narrow,
-          // repetitive subject matter.
           if (Array.isArray(body.messages)) {
             body.messages = [
               { role: 'system', content: FAMILY_TRIVIA_QUALITY },
@@ -77,6 +108,6 @@ if (typeof originalFetch === 'function') {
       (process.env.OPENAI_NEWS_SEARCH_MODEL || 'unchanged') +
       ', legacy-search=' +
       (process.env.OPENAI_MODEL || 'gpt-4o') +
-      ', family-trivia-quality=v2'
+      ', family-trivia-quality=v3'
   );
 }
