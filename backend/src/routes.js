@@ -2,8 +2,8 @@ const express = require('express');
 const router  = express.Router();
 const db      = require('./db');
 const { requireAuth, login } = require('./auth');
-const { refillBank, isRefilling } = require('./refill');
-const { checkCategoryTargets, getCategoryTargetStatus, isTargetRefilling } = require('./category-targets');
+const { generateBatch } = require('./refill');
+const manualGeneration = require('./manual-generation');
 
 const VALID_VOICES = ['alloy', 'echo', 'fable', 'onyx', 'nova', 'shimmer'];
 
@@ -130,8 +130,6 @@ router.post('/game/answer', async (req, res) => {
   try {
     await db.markUsed(questionId);
 
-    // Fire-and-forget category-aware refill check.
-    checkCategoryTargets().catch(console.error);
 
     const count = await db.getUnusedCount();
     res.json({ success: true, bankCount: count });
@@ -144,7 +142,7 @@ router.post('/game/answer', async (req, res) => {
 router.get('/game/bank-count', async (req, res) => {
   try {
     const count = await db.getUnusedCount();
-    res.json({ count, low: count < parseInt(process.env.LOW_QUESTION_THRESHOLD || '250') });
+    res.json({ count, low: false });
   } catch (err) {
     res.status(500).json({ error: 'Server error' });
   }
@@ -171,7 +169,7 @@ router.get('/game/category-counts', async (req, res) => {
 // Read-only refill status; useful from the game/admin UI and safe to expose.
 router.get('/game/category-targets', async (req, res) => {
   try {
-    res.json(await getCategoryTargetStatus());
+    res.json({ counts: (await db.getBankStats()).byCategory, targets: null, refilling: manualGeneration.getStatus().running });
   } catch (err) {
     res.status(500).json({ error: 'Server error' });
   }
@@ -185,7 +183,7 @@ router.get('/admin/stats', requireAuth, async (req, res) => {
       db.getBankStats(),
       db.getRefillLog(),
     ]);
-    res.json({ stats, refillLog, refilling: isRefilling() || isTargetRefilling() });
+    res.json({ stats, refillLog, refilling: manualGeneration.getStatus().running });
   } catch (err) {
     res.status(500).json({ error: 'Server error' });
   }
@@ -244,11 +242,19 @@ router.delete('/admin/questions/:id', requireAuth, async (req, res) => {
 });
 
 router.post('/admin/refill', requireAuth, async (req, res) => {
-  if (isRefilling() || isTargetRefilling()) {
-    return res.json({ message: 'Refill already in progress' });
+  const n = Number(req.body?.perCategory);
+  if (!Number.isInteger(n) || n < 1 || n > 100) {
+    return res.status(400).json({ error: 'Enter a whole number from 1 to 100 per category.' });
   }
-  checkCategoryTargets().catch(console.error);
-  res.json({ message: 'Category-target refill started in background' });
+  if (manualGeneration.getStatus().running) {
+    return res.status(409).json({ error: 'Generation is already running.' });
+  }
+  manualGeneration.start(n).catch(err => console.error('[manual-generation]', err));
+  res.json({ message: 'Generation started: ' + n + ' per category (up to ' + (n * db.CATEGORIES.length) + ' new questions).', status: manualGeneration.getStatus() });
+});
+
+router.get('/admin/refill/status', requireAuth, (req, res) => {
+  res.json(manualGeneration.getStatus());
 });
 
 router.get('/admin/categories', requireAuth, async (req, res) => {
