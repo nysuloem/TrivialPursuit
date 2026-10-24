@@ -242,15 +242,21 @@ router.delete('/admin/questions/:id', requireAuth, async (req, res) => {
 });
 
 router.post('/admin/refill', requireAuth, async (req, res) => {
-  const n = Number(req.body?.perCategory);
-  if (!Number.isInteger(n) || n < 1 || n > 100) {
-    return res.status(400).json({ error: 'Enter a whole number from 1 to 100 per category.' });
+  const requested = req.body?.categories;
+  if (!requested || typeof requested !== 'object' || Array.isArray(requested)) {
+    return res.status(400).json({ error: 'Provide category-specific quantities.' });
   }
-  if (manualGeneration.getStatus().running) {
-    return res.status(409).json({ error: 'Generation is already running.' });
+  const entries = Object.entries(requested);
+  if (!entries.length || entries.some(([cat, n]) =>
+    !db.CATEGORIES.includes(cat) || !Number.isInteger(n) || n < 0 || n > 100
+  )) {
+    return res.status(400).json({ error: 'Use whole numbers from 0 to 100 for valid categories.' });
   }
-  manualGeneration.start(n).catch(err => console.error('[manual-generation]', err));
-  res.json({ message: 'Generation started: ' + n + ' per category (up to ' + (n * db.CATEGORIES.length) + ' new questions).', status: manualGeneration.getStatus() });
+  const selected = Object.fromEntries(entries.filter(([, n]) => n > 0));
+  if (!Object.keys(selected).length) return res.status(400).json({ error: 'Select at least one category.' });
+  if (manualGeneration.getStatus().running) return res.status(409).json({ error: 'Generation already in progress.' });
+  manualGeneration.start(selected).catch(err => console.error('[manual-generation]', err));
+  res.json({ message: 'Generation started for ' + Object.values(selected).reduce((a,b)=>a+b,0) + ' requested questions.', status: manualGeneration.getStatus() });
 });
 
 router.get('/admin/refill/status', requireAuth, (req, res) => {
