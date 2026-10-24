@@ -36,5 +36,6 @@ export const getAdminQs      = (params)     => request('/admin/questions?' + new
 export const addQuestion     = (q)          => request('/admin/questions', { method: 'POST', body: q });
 export const editQuestion    = (id, q)      => request(`/admin/questions/${id}`, { method: 'PUT', body: q });
 export const deleteQuestion  = (id)         => request(`/admin/questions/${id}`, { method: 'DELETE' });
-export const triggerRefill   = ()           => request('/admin/refill', { method: 'POST' });
+export const triggerRefill   = (perCategory) => request('/admin/refill', { method: 'POST', body: { perCategory } });
+export const getRefillStatus = () => request('/admin/refill/status');
 export const getCategories_a = ()           => request('/admin/categories');
