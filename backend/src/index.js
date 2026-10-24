@@ -4,7 +4,6 @@ const cors    = require('cors');
 const db      = require('./db');
 const { initDB } = db;
 const { ensureDefaultAdmin } = require('./auth');
-const { checkCategoryTargets, getCategoryTargetStatus } = require('./category-targets');
 const routes  = require('./routes');
 
 const app  = express();
@@ -103,15 +102,6 @@ async function start() {
     app.listen(PORT, async () => {
       console.log(`🚀 Trivia backend running on port ${PORT}`);
       console.log(`   Environment: ${process.env.NODE_ENV || 'development'}`);
-      try {
-        const status = await getCategoryTargetStatus();
-        console.log('🎯 Category targets:', JSON.stringify(status));
-      } catch (err) {
-        console.warn('Could not read category targets at startup:', err.message);
-      }
-      checkCategoryTargets().catch(console.error);
-      const intervalMs = parseInt(process.env.CATEGORY_REFILL_INTERVAL_MS || '300000', 10);
-      setInterval(() => checkCategoryTargets().catch(console.error), intervalMs).unref();
     });
   } catch (err) {
     console.error('❌ Failed to start:', err);
