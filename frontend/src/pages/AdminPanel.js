@@ -23,7 +23,7 @@ export default function AdminPanel() {
   const [formErr,    setFormErr]    = useState('');
   const [formOk,     setFormOk]     = useState('');
   const [refillMsg,  setRefillMsg]  = useState('');
-  const [perCategory, setPerCategory] = useState(25);
+  const [generationCounts, setGenerationCounts] = useState({});
   const [generation, setGeneration] = useState(null);
   const [loading,    setLoading]    = useState(false);
 
@@ -124,7 +124,8 @@ export default function AdminPanel() {
   const handleRefill = async () => {
     setRefillMsg('Starting generation...');
     try {
-      const r = await triggerRefill(Number(perCategory));
+      const requested = Object.fromEntries(categories.map(cat => [cat, Number(generationCounts[cat] ?? 0)]).filter(([, n]) => n > 0));
+      const r = await triggerRefill(requested);
       setRefillMsg(r.message);
       setGeneration(r.status);
     } catch (err) { setRefillMsg('Error: ' + err.message); }
@@ -176,14 +177,28 @@ export default function AdminPanel() {
           </div>
         )}
 
-        {/* Refill controls */}
-        <div style={{ background: '#111', border: '1px solid #222', borderRadius: 8, padding: 14, marginBottom: 20, display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-          <label style={{ color: '#aaa', fontSize: 12, fontFamily: 'monospace' }}>New questions per category
-            <input aria-label="Questions per category" type="number" min="1" max="100" step="1" value={perCategory} onChange={e => setPerCategory(e.target.value)} style={{ ...S.input, width: 100, marginLeft: 12 }} />
-          </label>
-          <button onClick={handleRefill} disabled={generation?.running || !Number.isInteger(Number(perCategory)) || Number(perCategory) < 1 || Number(perCategory) > 100} style={S.btn('#d97706')}>🤖 GENERATE {Number(perCategory || 0) * categories.length} QUESTIONS WITH AI</button>
-          {generation && <div style={{ color: '#aaa', fontSize: 12, fontFamily: 'monospace' }}>{generation.running ? 'Generating' : generation.finishedAt ? 'Last run completed' : 'Idle'} · Added {generation.totalAdded || 0} / {generation.requestedTotal || 0}{generation.error ? ' · ' + generation.error : ''}</div>}
-          {refillMsg && <div style={{ color: '#aaa', fontSize: 12, fontFamily: 'monospace' }}>{refillMsg}</div>}
+        {/* Manual category-specific generation; zero means skip */}
+        <div style={{ background: '#111', border: '1px solid #222', borderRadius: 8, padding: 16, marginBottom: 20 }}>
+          <h3 style={{ color: '#eee', fontFamily: 'monospace', fontSize: 14, marginTop: 0 }}>🤖 AI QUESTION GENERATOR</h3>
+          <div style={{ color: '#888', fontFamily: 'monospace', fontSize: 11, marginBottom: 14 }}>Choose how many NEW questions to add in each category. Leave at 0 to skip.</div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(230px,1fr))', gap: 10 }}>
+            {categories.map(category => (
+              <label key={category} style={{ color: '#ddd', fontSize: 12, fontFamily: 'monospace', display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {category}
+                <input type="number" min="0" max="100" step="1" value={generationCounts[category] ?? 0}
+                  onChange={e => setGenerationCounts(old => ({ ...old, [category]: e.target.value }))}
+                  style={{ ...S.input, maxWidth: 110 }} />
+                <span style={{ color: '#666', fontSize: 10 }}>Added: {generation?.byCategory?.[category] ?? 0}</span>
+              </label>
+            ))}
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 12, marginTop: 16 }}>
+            <button onClick={handleRefill} disabled={generation?.running || !categories.some(c => Number(generationCounts[c] ?? 0) > 0) || categories.some(c => !Number.isInteger(Number(generationCounts[c] ?? 0)) || Number(generationCounts[c] ?? 0) < 0 || Number(generationCounts[c] ?? 0) > 100)}
+              style={S.btn('#d97706')}>GENERATE {categories.reduce((sum, c) => sum + (Number(generationCounts[c] ?? 0) || 0), 0)} QUESTIONS WITH AI</button>
+            <div style={{ color: '#aaa', fontSize: 12, fontFamily: 'monospace' }}>{generation?.running ? 'Generating...' : generation?.finishedAt ? 'Last run finished' : 'Ready'} · Added {generation?.totalAdded ?? 0} / {generation?.requestedTotal ?? 0}</div>
+          </div>
+          {generation?.error && <div style={{ color: '#fbbf24', fontSize: 11, marginTop: 8 }}>{generation.error}</div>}
+          {refillMsg && <div style={{ color: '#aaa', fontSize: 12, marginTop: 8 }}>{refillMsg}</div>}
         </div>
 
         {/* Add / Edit form */}
