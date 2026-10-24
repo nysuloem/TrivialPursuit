@@ -2,22 +2,24 @@ const db = require('./db');
 const { generateBatch } = require('./refill');
 
 let status = {
-  running: false, perCategory: 0, requestedTotal: 0,
+  running: false, requested: {}, requestedTotal: 0,
   totalAdded: 0, byCategory: {}, startedAt: null, finishedAt: null, error: null,
 };
 
 function getStatus() { return { ...status, byCategory: { ...status.byCategory } }; }
 
-async function start(perCategory) {
+async function start(requested) {
+  const requests = Object.fromEntries(Object.entries(requested).filter(([,n]) => Number.isInteger(n) && n > 0));
   if (status.running) throw new Error('Generation already running');
-  status = { running: true, perCategory, requestedTotal: perCategory * db.CATEGORIES.length,
+  status = { running: true, requested: requests, requestedTotal: Object.values(requests).reduce((a,b)=>a+b,0),
     totalAdded: 0, byCategory: {}, startedAt: new Date().toISOString(), finishedAt: null, error: null };
   const usedTopics = [];
   const cache = new Map();
   let before = 0;
   try {
     before = await db.getUnusedCount();
-    for (const category of db.CATEGORIES) {
+    for (const category of db.CATEGORIES.filter(cat => requests[cat])) {
+      const perCategory = requests[category];
       let added = 0;
       let attempts = 0;
       const maxAttempts = Math.max(6, Math.ceil(perCategory / 5) * 5);
@@ -34,7 +36,7 @@ async function start(perCategory) {
       }
       status.byCategory[category] = added;
     }
-    const shortages = db.CATEGORIES.filter(cat => status.byCategory[cat] < perCategory);
+    const shortages = Object.keys(requests).filter(cat => (status.byCategory[cat] || 0) < requests[cat]);
     if (shortages.length) status.error = 'Duplicate checks prevented full quota in: ' + shortages.join(', ');
     await db.logRefill(before, status.totalAdded, shortages.length ? 'partial' : 'success');
   } catch (err) {
