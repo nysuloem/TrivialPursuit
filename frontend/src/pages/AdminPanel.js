@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import {
   adminLogin, getAdminStats, getAdminQs,
   addQuestion, editQuestion, deleteQuestion,
-  triggerRefill, getCategories_a,
+  triggerRefill, getRefillStatus, getCategories_a,
 } from '../api';
 
 const INITIAL_FORM = { category: '', question: '', answer: '', is_pie: false, canadian: false };
@@ -23,6 +23,8 @@ export default function AdminPanel() {
   const [formErr,    setFormErr]    = useState('');
   const [formOk,     setFormOk]     = useState('');
   const [refillMsg,  setRefillMsg]  = useState('');
+  const [perCategory, setPerCategory] = useState(25);
+  const [generation, setGeneration] = useState(null);
   const [loading,    setLoading]    = useState(false);
 
   const logout = () => {
@@ -101,12 +103,30 @@ export default function AdminPanel() {
     try { await deleteQuestion(id); loadStats(); loadQuestions(); } catch {}
   };
 
+  useEffect(() => {
+    if (!token) return;
+    const poll = async () => {
+      try {
+        const status = await getRefillStatus();
+        setGeneration(status);
+        if (status.running) {
+          loadStats();
+        } else if (status.finishedAt) {
+          loadStats();
+        }
+      } catch {}
+    };
+    poll();
+    const interval = setInterval(poll, 5000);
+    return () => clearInterval(interval);
+  }, [token, loadStats]);
+
   const handleRefill = async () => {
-    setRefillMsg('Starting refill...');
+    setRefillMsg('Starting generation...');
     try {
-      const r = await triggerRefill();
+      const r = await triggerRefill(Number(perCategory));
       setRefillMsg(r.message);
-      setTimeout(() => { loadStats(); loadQuestions(); }, 5000);
+      setGeneration(r.status);
     } catch (err) { setRefillMsg('Error: ' + err.message); }
   };
 
@@ -142,9 +162,8 @@ export default function AdminPanel() {
         {stats && (
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, marginBottom: 20 }}>
             <div style={S.statCard}>
-              <div style={{ color: stats.stats.total < 250 ? '#f87171' : '#4ade80', fontSize: 28, fontWeight: 900, fontFamily: 'monospace' }}>{stats.stats.total}</div>
+              <div style={{ color: '#4ade80', fontSize: 28, fontWeight: 900, fontFamily: 'monospace' }}>{stats.stats.total}</div>
               <div style={{ color: '#555', fontSize: 10, fontFamily: 'monospace' }}>AVAILABLE QUESTIONS</div>
-              {stats.stats.total < 250 && <div style={{ color: '#f87171', fontSize: 10, fontFamily: 'monospace', marginTop: 4 }}>⚠ BELOW THRESHOLD</div>}
               {stats.refilling && <div style={{ color: '#fbbf24', fontSize: 10, fontFamily: 'monospace', marginTop: 4 }}>🔄 REFILLING...</div>}
             </div>
             {stats.stats.byCategory.map(row => (
@@ -159,7 +178,11 @@ export default function AdminPanel() {
 
         {/* Refill controls */}
         <div style={{ background: '#111', border: '1px solid #222', borderRadius: 8, padding: 14, marginBottom: 20, display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-          <button onClick={handleRefill} style={S.btn('#d97706')}>🤖 GENERATE 250 QUESTIONS WITH AI</button>
+          <label style={{ color: '#aaa', fontSize: 12, fontFamily: 'monospace' }}>New questions per category
+            <input aria-label="Questions per category" type="number" min="1" max="100" step="1" value={perCategory} onChange={e => setPerCategory(e.target.value)} style={{ ...S.input, width: 100, marginLeft: 12 }} />
+          </label>
+          <button onClick={handleRefill} disabled={generation?.running || !Number.isInteger(Number(perCategory)) || Number(perCategory) < 1 || Number(perCategory) > 100} style={S.btn('#d97706')}>🤖 GENERATE {Number(perCategory || 0) * categories.length} QUESTIONS WITH AI</button>
+          {generation && <div style={{ color: '#aaa', fontSize: 12, fontFamily: 'monospace' }}>{generation.running ? 'Generating' : generation.finishedAt ? 'Last run completed' : 'Idle'} · Added {generation.totalAdded || 0} / {generation.requestedTotal || 0}{generation.error ? ' · ' + generation.error : ''}</div>}
           {refillMsg && <div style={{ color: '#aaa', fontSize: 12, fontFamily: 'monospace' }}>{refillMsg}</div>}
         </div>
 
