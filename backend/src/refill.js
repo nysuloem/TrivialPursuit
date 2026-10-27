@@ -1,3 +1,5 @@
+const {SCIENCE_DISCIPLINES, SCIENCE_RULES, buildScienceSlots} = require('./science-strategy');
+const {MEME_RULE, asksForMemeName} = require('./question-policy');
 const OpenAI = require('openai');
 const {
   insertQuestions,
@@ -73,17 +75,7 @@ const CATEGORY_SLOT_PLANS = {
     { subcategory: 'music', count: 3 },
   ],
 
-  'Science & Nature': [
-    { subcategory: 'animals', count: 2 },
-    { subcategory: 'plants', count: 1 },
-    { subcategory: 'human_body', count: 1 },
-    { subcategory: 'space', count: 1 },
-    { subcategory: 'technology', count: 1 },
-    { subcategory: 'chemistry', count: 1 },
-    { subcategory: 'physics', count: 1 },
-    { subcategory: 'earth_science', count: 1 },
-    { subcategory: 'ecology', count: 1 },
-  ],
+  'Science & Nature': Object.keys(SCIENCE_DISCIPLINES).map(subcategory => ({subcategory, count: 1})),
 
   'Pop Culture & Current Events': [
     { subcategory: 'current_events', count: 3 },
@@ -951,7 +943,7 @@ const QUESTION_SYSTEM_PROMPT = [
   '',
   '=== PLAYABILITY TARGET ===',
   'This is a family board game, not a quiz bowl tournament.',
-  'The answer should usually be a recognizable household-name topic.',
+  'The answer should usually be recognizable; university science may use introductory-undergraduate terminology.',
   'The clue should be interesting, but not obscure.',
   'A good question makes players say: "I should know this."',
   'A bad question makes players say: "How would anyone know that?"',
@@ -978,9 +970,9 @@ const QUESTION_SYSTEM_PROMPT = [
   'Video game questions must rotate across consoles, characters, gameplay mechanics, developers/studios, franchises, music/sound, arcade history, handheld systems, PC gaming, esports, mobile games, and cultural impact.',
   'Board/card game questions must rotate across classic games, modern tabletop games, party games, word games, strategy games, card games, trading card games, pieces/components, rules/scoring, inventors, and origin stories.',
   '',
+  MEME_RULE,
   '=== SCIENCE & NATURE RULES ===',
-  'Science & Nature questions should be accessible but not elementary-school obvious.',
-  'Avoid overly simple questions such as: which planet has rings, which planet is red, what gas do humans breathe, what organ pumps blood, what do bees make, what is H2O, or how many legs does a spider have.',
+  SCIENCE_RULES,
   'Prefer questions that connect a familiar answer to an interesting mechanism, adaptation, discovery, comparison, or real-world application.',
   'Rotate across animals, plants, human body, space, chemistry, physics, technology, earth science, ecology, medicine, food science, and environmental science.',
   '',
@@ -1072,6 +1064,7 @@ function normalizeSubcategory(category, subcategory) {
     if (safe.includes('card') || safe.includes('poker') || safe.includes('uno')) return 'card_games';
   }
 
+  if (category === "Science & Nature" && Object.hasOwn(SCIENCE_DISCIPLINES, safe)) return safe;
   const allowed = VALID_SUBCATEGORIES[category] || [];
   if (allowed.includes(safe)) return safe;
 
@@ -1283,6 +1276,8 @@ function overlapsWithMusicCategory(q) {
 }
 
 function scienceQuestionTooSimple(q) {
+  // Elementary questions are intentional under the new 20/40/40 plan.
+  if (q && q.education_level === "elementary") return false;
   if (!q || q.category !== 'Science & Nature') return false;
 
   const text = [q.question, q.answer].join(' ').toLowerCase();
@@ -1487,6 +1482,7 @@ function sourceRequired(slot) {
 }
 
 function buildSlotsForCategory(category, batchNum, desiredCount, pieCategory) {
+  if (category === "Science & Nature") return buildScienceSlots(batchNum, desiredCount, pieCategory);
   const plan = CATEGORY_SLOT_PLANS[category] || [
     { subcategory: 'general', count: desiredCount },
   ];
@@ -1566,13 +1562,8 @@ function buildSearchQuery(slot) {
   }
 
   if (slot.category === 'Science & Nature') {
-    return [
-      eraText,
-      guidance,
-      'accessible but not elementary-school science trivia',
-      'familiar answer with interesting mechanism adaptation discovery comparison or application',
-      'avoid simple planet facts simple animal records and basic definitions',
-    ].filter(Boolean).join(' ');
+    return [slot.discipline, slot.education_level + ' curriculum level', slot.angle,
+      'accurate scientific facts for concise trivia', SCIENCE_RULES].join(' ');
   }
 
   if (slot.category === 'Pop Culture & Current Events') {
@@ -1774,7 +1765,7 @@ async function searchWeb(query, requireFresh = false) {
               'Prioritize facts that are accessible to a Canadian/North American family.',
               'Avoid obscure specialist facts and minor names.',
               'If this is Sports & Games, include a mix of sports and games, and do not make all sports questions player-stat questions.',
-              'If this is Science & Nature, avoid elementary-school obvious facts and instead find familiar answers connected to mechanisms, adaptations, discoveries, comparisons, or applications.',
+              SCIENCE_RULES,
               'If this is Pop Culture & Current Events, avoid music-category facts about songs, albums, chart records, Grammys, tours, bands, singers, rappers, lyrics, and music videos.',
             ].join('\n'),
           },
@@ -1808,7 +1799,7 @@ async function searchWeb(query, requireFresh = false) {
             'Avoid exact dates, niche records, specialist facts, and minor names.',
             'Do not claim anything is current, latest, newest, or recent.',
             'If this is Sports & Games, include non-player sports topics as well as games.',
-            'If this is Science & Nature, avoid elementary-school obvious facts and instead use mechanisms, adaptations, discoveries, comparisons, or applications.',
+            SCIENCE_RULES,
             'If this is Pop Culture & Current Events, avoid music-category facts about songs, albums, chart records, Grammys, tours, bands, singers, rappers, lyrics, and music videos.',
           ].join('\n'),
         },
@@ -1845,8 +1836,10 @@ async function generateQuestionForSlot(slot, content, usedTopics) {
       .join(', ') || 'none',
     '',
     'Critical rules:',
-    '- The answer must be recognizable to at least one generation at a family game table.',
-    '- The clue can teach something new, but the answer itself should not be obscure.',
+    SCIENCE_RULES,
+    MEME_RULE,
+    '- Except university Science & Nature (introductory undergraduate terminology allowed), the answer must be recognizable to at least one generation at a family game table.',
+    '- Use the assigned education level; undergraduate terminology is allowed in university science, but avoid obscure specialist facts.',
     '- Do not ask for an isolated statistic unless the statistic is iconic.',
     '- Respect the exact subcategory, angle, era, and difficulty from the slot.',
     '- For Sports & Games, if the slot is sports_general or sports_culture, write a real sports question, not a video game or board game question.',
@@ -1856,8 +1849,8 @@ async function generateQuestionForSlot(slot, content, usedTopics) {
     '- For 1980s, 1990s, and 2000s slots, choose content genuinely associated with that decade.',
     '- For timeless slots, choose broadly familiar facts not tied to one news cycle.',
     '- For History category: NEVER write questions about events after year 2000. History questions must be about events that happened before 2001. The 1990s is the most recent era allowed for History.',
-    '- For Science & Nature, avoid elementary-school obvious questions. Ask about mechanisms, adaptations, discoveries, comparisons, or applications.',
-    '- For Science & Nature, the answer should be recognizable, but the clue should not be a basic definition.',
+    SCIENCE_RULES,
+    SCIENCE_RULES,
     '- For current_events and sports_news, use only the fresh source material provided.',
     '- For current_events and sports_news, include the year or month naturally in the clue if needed.',
     '- For current_events and sports_news, do not write vague questions like "Which country was in the news?" Be specific enough to be fair.',
@@ -1887,8 +1880,8 @@ async function generateQuestionForSlot(slot, content, usedTopics) {
 
   const obj = JSON.parse(response.choices[0]?.message?.content || '{}');
 
-  const category = normalizeCategory(obj.category || slot.category) || slot.category;
-  const subcategory = normalizeSubcategory(category, obj.subcategory || slot.subcategory);
+  const category = slot.category === 'Science & Nature' ? slot.category : normalizeCategory(obj.category || slot.category) || slot.category;
+  const subcategory = slot.category === 'Science & Nature' ? slot.subcategory : normalizeSubcategory(category, obj.subcategory || slot.subcategory);
 
   return {
     category,
@@ -1901,6 +1894,7 @@ async function generateQuestionForSlot(slot, content, usedTopics) {
     precise_era: String(obj.era || slot.era).trim(),
     era: legacyEra(String(obj.era || slot.era).trim()),
     difficulty: String(obj.difficulty || slot.difficulty).trim(),
+    education_level: slot.education_level,
     topic_key: '',
   };
 }
@@ -1916,10 +1910,12 @@ async function rewriteQuestion(q) {
       JSON.stringify(q, null, 2),
       '',
       'Rewrite only the question. Keep the same answer.',
+    SCIENCE_RULES,
+    MEME_RULE,
       'The rewritten question must not contain the answer words.',
       'Use a helpful clue and ask directly.',
       'If this is Pop Culture & Current Events, do not turn it into a music question.',
-      'If this is Science & Nature, do not make it elementary-school obvious.',
+      SCIENCE_RULES,
       '',
       'Return ONLY valid JSON: { "question": "rewritten question here" }',
     ].join('\n');
@@ -1945,6 +1941,7 @@ async function rewriteQuestion(q) {
 }
 
 async function validateQuestion(q) {
+  if (asksForMemeName(q)) return false;
   const today = todayLong();
 
   const isCurrentNewsQuestion =
@@ -1953,6 +1950,8 @@ async function validateQuestion(q) {
 
   const prompt = [
     'Evaluate this trivia question for a Canadian family board game.',
+    SCIENCE_RULES,
+    MEME_RULE,
     '',
     'Today is ' + today + '.',
     'Any event date before today is a past event, not a future event.',
@@ -1963,16 +1962,16 @@ async function validateQuestion(q) {
     JSON.stringify(q, null, 2),
     '',
     'Score from 1 to 5:',
-    '- recognizability: For classic trivia, is the answer familiar to many people? For current_events and sports_news, is the story recognizable as a mainstream headline or made fair by the clue?',
+    '- recognizability: For university Science & Nature, is the answer a standard introductory-undergraduate concept in its assigned discipline? For other trivia, is it familiar to the intended audience?',
     '- clue_helpfulness: Does the question give enough context?',
     '- obscurity_risk: Is this too niche or specialist?',
     '- diversity_value: Does this add variety compared with common trivia questions?',
     '',
     'Reject questions that are too obscure, too stat-heavy, too specialist, misleading, ambiguous, or only answerable by a superfan.',
-    'For pie questions, allow slightly harder clues, but still require a recognizable answer.',
+    'For pie questions, use harder clues within the assigned education level; university science may use standard undergraduate terminology.',
     'For Sports & Games, reject if a sports slot produced a video game, board game, or card game question.',
     'For Sports & Games, do not reject a sports question merely because it is not about a player. Venues, broadcasters, mascots, trophies, rules, teams, leagues, fan traditions, and equipment are valid sports topics.',
-    'For Science & Nature, reject elementary-school obvious questions such as basic planet facts, basic animal records, or simple definitions.',
+    SCIENCE_RULES,
     'For Pop Culture & Current Events, teen-culture answers may be generation-specific, but the clue must be helpful.',
     'Reject Pop Culture & Current Events questions if they really belong in the Music category: songs, albums, chart records, Grammys, concert tours, music videos, singers-as-musicians, rappers-as-musicians, bands, lyrics, or music-industry achievements.',
     '',
@@ -2125,6 +2124,8 @@ async function generateQuestionWithRetries(slot, usedTopics, currentQuestions, d
       continue;
     }
 
+    if (asksForMemeName(q)) continue;
+
     if (scienceQuestionTooSimple(q)) {
       console.log('   Rejected overly simple Science question: ' + q.answer);
       continue;
@@ -2151,7 +2152,11 @@ async function generateQuestionWithRetries(slot, usedTopics, currentQuestions, d
 }
 
 async function generateCategoryBatch(category, batchNum, count, pieCategory, usedTopics, dbQuestionCache) {
-  const slots = buildSlotsForCategory(category, batchNum, count, pieCategory);
+  const slots = category === 'Science & Nature'
+    ? buildScienceSlots(batchNum, count, pieCategory,
+        [...await getExistingQuestionsForCategory(category, dbQuestionCache),
+         ...usedTopics.filter(q => q && typeof q === 'object')])
+    : buildSlotsForCategory(category, batchNum, count, pieCategory);
   const questions = [];
 
   console.log('     [' + category + '] Generating from ' + slots.length + ' diversity slots...');

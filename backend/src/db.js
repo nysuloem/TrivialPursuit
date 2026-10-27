@@ -1,3 +1,4 @@
+const {asksForMemeName} = require('./question-policy');
 const { Pool } = require('pg');
 
 const pool = new Pool({
@@ -204,7 +205,7 @@ async function getTwoCategoryOptions(ownedCategories = []) {
   return r.rows.map(row => row.category);
 }
 
-async function getQuestion(category, isPie = false, eraTarget = null, excludeSubcats = []) {
+async function getQuestionCandidate(category, isPie = false, eraTarget = null, excludeSubcats = [], excludedIds = []) {
   let eraClause = '';
   let params = [category, isPie];
 
@@ -217,6 +218,9 @@ async function getQuestion(category, isPie = false, eraTarget = null, excludeSub
     params.push(excludeSubcats);
   }
 
+  const skipClause = `AND id != ALL($${params.length + 1}::integer[])`;
+  params.push(excludedIds);
+
   const r = await pool.query(`
     SELECT id, category, question, answer, is_pie, canadian, subcategory, era
     FROM questions
@@ -225,6 +229,7 @@ async function getQuestion(category, isPie = false, eraTarget = null, excludeSub
       AND is_pie = $2
       ${eraClause}
       ${subcatClause}
+      ${skipClause}
     ORDER BY RANDOM()
     LIMIT 1
   `, params);
@@ -237,9 +242,10 @@ async function getQuestion(category, isPie = false, eraTarget = null, excludeSub
         AND used = FALSE
         AND is_pie = $2
         ${eraClause}
+        AND id != ALL($3::integer[])
       ORDER BY RANDOM()
       LIMIT 1
-    `, [category, isPie]);
+    `, [category, isPie, excludedIds]);
     if (fallback.rows[0]) return fallback.rows[0];
   }
 
@@ -250,13 +256,24 @@ async function getQuestion(category, isPie = false, eraTarget = null, excludeSub
       WHERE category = $1
         AND used = FALSE
         AND is_pie = $2
+        AND id != ALL($3::integer[])
       ORDER BY RANDOM()
       LIMIT 1
-    `, [category, isPie]);
+    `, [category, isPie, excludedIds]);
     return final.rows[0] || null;
   }
 
   return r.rows[0];
+}
+
+// Skip blocked legacy questions without deleting or marking bank entries used.
+async function getQuestion(category, isPie = false, eraTarget = null, excludeSubcats = []) {
+  const excludedIds = [];
+  while (true) {
+    const question = await getQuestionCandidate(category, isPie, eraTarget, excludeSubcats, excludedIds);
+    if (!question || !asksForMemeName(question)) return question;
+    excludedIds.push(question.id);
+  }
 }
 
 async function markUsed(questionId) {
