@@ -1,0 +1,102 @@
+import React, {useState,useEffect,useRef} from 'react';
+import {getQuestion,markAnswered} from '../api';
+import {BOARD,CATS,COLORS,destinations,rollDie} from './board-rules';
+import './BoardGame.css';
+const TEAMS=[{name:'Boys',token:'👦',color:'#429bf5'},{name:'Girls',token:'👧',color:'#ec78b2'}];
+function TokenIcon({team=0,x,y}){const girl=team===1;return <svg x={x} y={y} width="40" height="40" viewBox="0 0 40 40" aria-label={girl?'Girl token':'Boy token'} role="img"><path d={girl?'M8 22C5 3 34 0 33 24L35 31H5Z':'M8 20V12C8 0 33 1 32 17L29 22Z'} fill={girl?'#613d2d':'#59442b'}/><path d="M6 40Q8 27 20 27Q33 27 35 40" fill={girl?'#ffafd4':'#9bd3ff'}/><ellipse cx="20" cy="18" rx="10" ry="12" fill="#f5c9a1"/><path d={girl?'M10 13Q17 14 23 6Q27 12 31 14L29 7 18 4 10 8Z':'M10 13L12 7 23 5 30 10 28 13 20 9 15 13Z'} fill={girl?'#613d2d':'#59442b'}/><circle cx="16" cy="19" r="1.2" fill="#382a27"/><circle cx="24" cy="19" r="1.2" fill="#382a27"/><path d="M16 24Q20 27 24 24" fill="none" stroke="#ab6254" strokeWidth="1.4"/></svg>;}
+function Die({value}){const patterns={1:[4],2:[0,8],3:[0,4,8],4:[0,2,6,8],5:[0,2,4,6,8],6:[0,2,3,5,6,8]};return <span className="die-face" role="img" aria-label={`Dice: ${value}`}>{Array.from({length:9},(_,i)=><i key={i} style={{visibility:patterns[value].includes(i)?'visible':'hidden'}}/>)}</span>;}
+const SAVE='trivial-pursuit-board-v1';
+const fresh=()=>({phase:'intro',active:0,positions:['hub','hub'],wedges:[[],[]],scores:[0,0],roll:null,question:null,category:null,pie:false,final:false,revealed:false});
+function restore(){try{const g=JSON.parse(localStorage.getItem(SAVE));if(g&&g.version===1&&g.positions.every(p=>BOARD[p])&&['board','move','question','category','landing','winner'].includes(g.phase))return g;}catch{}return fresh();}
+const wait=ms=>new Promise(r=>setTimeout(r,ms));
+function arc(r,a){return [500+r*Math.cos(a),500+r*Math.sin(a)];}
+function cellPath(i){const a=(i-.5)*Math.PI/21,b=(i+.5)*Math.PI/21;const p=[arc(374,a),arc(466,a),arc(466,b),arc(374,b)];return `M${p[0]} L${p[1]} A466 466 0 0 1 ${p[2]} L${p[3]} A374 374 0 0 0 ${p[0]} Z`;}
+function Board({game,allowed,onMove,mini=false}){
+ const targets=new Set(allowed);
+ const click=(node)=>()=>targets.has(node.id)&&onMove(node.id);
+ const accessible=node=>({role:targets.has(node.id)?'button':undefined,tabIndex:targets.has(node.id)?0:undefined,
+   'aria-label':`${node.kind==='hub'?'Centre':node.category}${node.kind==='pie'?' wedge space':node.kind==='roll'?' roll again':''}${targets.has(node.id)?', move here':''}`,
+   onClick:click(node),onKeyDown:e=>{if(targets.has(node.id)&&['Enter',' '].includes(e.key)){e.preventDefault();onMove(node.id);}}});
+ return <svg className={`game-board ${mini?'mini-board':''}`} viewBox="0 0 1000 1000" aria-label="Trivial Pursuit game board">
+  <defs><radialGradient id="felt"><stop stopColor="#183c43"/><stop offset="1" stopColor="#06151d"/></radialGradient>
+  <filter id="spaceGlow"><feGaussianBlur stdDeviation="5"/></filter></defs>
+  <image href="/trivial-pursuit-board.jpg" x="0" y="0" width="1000" height="1000" preserveAspectRatio="none"/>
+  <g opacity="0">
+  <circle cx="500" cy="500" r="494" fill="url(#felt)" stroke="#9caeb2" strokeWidth="4"/>
+  {CATS.map((c,i)=>{const a=(i+.04)*Math.PI/3,b=(i+.96)*Math.PI/3;return <path key={c} d={`M500 500 L${arc(368,a)} A368 368 0 0 1 ${arc(368,b)} Z`} fill={COLORS[c]} opacity=".22"/>;})}
+  <text x="500" y="275" textAnchor="middle" fill="#e5f2ef" fontSize="35" fontFamily="Georgia" fontStyle="italic">Trivial Pursuit</text>
+  </g>
+  {Object.values(BOARD).filter(n=>n.id!=='hub').map(node=>{
+    const lit=targets.has(node.id),fill=node.kind==='roll'?'#dbe3e6':COLORS[node.category];
+    return <g key={node.id} {...accessible(node)} className={lit?'board-space legal-space':'board-space'}>
+      {node.id[0]==='r'?<path d={cellPath(+node.id.slice(1))} fill={lit?fill:'transparent'} stroke={lit?'#fffbd2':'#0c2330'} strokeWidth={lit?7:0}/>:<rect x={node.x-28} y={node.y-27} width="56" height="54" transform={`rotate(${node.angle*180/Math.PI},${node.x},${node.y})`} fill={lit?fill:'transparent'} stroke={lit?'#fffbd2':'#0c2330'} strokeWidth={lit?7:0}/>}
+      {node.kind==='pie'&&<g opacity={lit?1:0}><circle cx={node.x} cy={node.y} r="25" fill="#142733" stroke="#f1e9c9" strokeWidth="2"/>{Array.from({length:6},(_,j)=><line key={j} x1={node.x} y1={node.y} x2={node.x+23*Math.cos(j*Math.PI/3)} y2={node.y+23*Math.sin(j*Math.PI/3)} stroke="#eee" strokeWidth="2"/>)}</g>}
+      {node.kind==='roll'&&lit&&<text x={node.x} y={node.y+13} textAnchor="middle" fill="#183140" fontSize="39">⚄</text>}
+      {lit&&<circle cx={node.x} cy={node.y} r="9" fill="white" stroke="#26363c" strokeWidth="2"/>}
+    </g>;
+  })}
+  <g {...accessible(BOARD.hub)} className={targets.has('hub')?'board-space legal-space':'board-space'}><circle cx="500" cy="500" r="92" fill="transparent" stroke={targets.has('hub')?'#fffbd2':'#233d4a'} strokeWidth={targets.has('hub')?7:0}/>
+    {false&&CATS.map((c,i)=><path key={c} d={`M500 500 L${arc(84,i*Math.PI/3)} A84 84 0 0 1 ${arc(84,(i+1)*Math.PI/3)} Z`} fill={COLORS[c]} stroke="#f0eee3" strokeWidth="2"/>)}</g>
+  {game.positions.map((id,i)=>{const n=BOARD[id],t=TEAMS[i];const together=game.positions[0]===game.positions[1];const x=n.x+(together?(i===0?-24:24):0);return <g key={i} className="board-token" pointerEvents="none" style={{transform:`translate(${x}px,${n.y}px)`}}><circle r="27" fill={t.color} stroke="#fff" strokeWidth="4"/><TokenIcon team={i} x={-20} y={-20}/>{game.active===i&&<circle r="34" fill="none" stroke="#fff" strokeWidth="3"/>}</g>;})}
+ </svg>;
+}
+export default function BoardGame(){
+ const [game,setGame]=useState(restore),[busy,setBusy]=useState(false),[error,setError]=useState(''),[opening,setOpening]=useState(false),[rolling,setRolling]=useState(false),[die,setDie]=useState(1),[speaking,setSpeaking]=useState(false);
+ const audio=useRef(null),controller=useRef(null),speechSerial=useRef(0),alive=useRef(true),lock=useRef(false);
+ const team=TEAMS[game.active];
+ useEffect(()=>{try{if(!['intro','opening'].includes(game.phase))localStorage.setItem(SAVE,JSON.stringify({...game,phase:game.phase==='pieIntro'?'landing':game.phase,version:1}));}catch{}},[game]);
+ function stopSpeech(){speechSerial.current++;controller.current?.abort();audio.current?.pause();audio.current=null;if(window.speechSynthesis)window.speechSynthesis.cancel();setSpeaking(false);}
+ async function say(text){
+  stopSpeech();const serial=speechSerial.current;const abort=new AbortController();controller.current=abort;const timeout=setTimeout(()=>abort.abort(),12000);setSpeaking(true);
+  let url;
+  try{const r=await fetch(`${process.env.REACT_APP_API_URL||''}/api/tts`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text,voice:game.active===0?'onyx':'nova'}),signal:abort.signal});if(!r.ok)throw Error('Speech unavailable');url=URL.createObjectURL(await r.blob());if(serial!==speechSerial.current)return;const a=new Audio(url);audio.current=a;await new Promise((resolve,reject)=>{a.onended=resolve;a.onerror=reject;a.play().catch(reject);});}
+  catch(e){if(serial===speechSerial.current&&alive.current&&window.speechSynthesis){await new Promise(resolve=>{const u=new SpeechSynthesisUtterance(text);u.onend=resolve;u.onerror=resolve;window.speechSynthesis.speak(u);});}}
+  finally{clearTimeout(timeout);if(url)URL.revokeObjectURL(url);if(serial===speechSerial.current&&alive.current)setSpeaking(false);}
+ }
+ useEffect(()=>{alive.current=true;return()=>{alive.current=false;speechSerial.current++;controller.current?.abort();audio.current?.pause();window.speechSynthesis?.cancel();};},[]);
+ // No reading while the box or wedge overlays cover the question.
+ useEffect(()=>{if(game.phase==='question'&&game.question)say(game.question.question);else stopSpeech();return()=>stopSpeech();},[game.phase,game.question?.id]); // eslint-disable-line
+ async function openBox(){if(lock.current)return;lock.current=true;setOpening(true);await Promise.all([say("Let's Play Trivial Pursuit"),wait(5200)]);if(alive.current){setGame({...fresh(),phase:'board'});setOpening(false);}lock.current=false;}
+ async function roll(){if(lock.current||rolling)return;lock.current=true;stopSpeech();setRolling(true);for(let i=0;i<10;i++){setDie(rollDie());await wait(80);}const n=rollDie();setDie(n);if(alive.current){setRolling(false);setGame(g=>({...g,roll:n,phase:'move'}));}lock.current=false;}
+ const allowed=game.phase==='move'?destinations(game.positions[game.active],game.roll):[];
+ async function ask(category,pie,final=false){
+  if(lock.current)return;lock.current=true;setBusy(true);setError('');stopSpeech();
+  try{const data=await getQuestion(category,pie);if(!data.question)throw Error('No question returned');if(pie&&data.fallbackFromPie)throw Error('No pie question is available for '+category+'. Add pie questions to this category, then retry');
+    // Keep landing data for retry if the bank request fails.
+    const next={category,pie:pie&&!data.fallbackFromPie,final,question:data.question,revealed:false};
+    if(pie&&!data.fallbackFromPie){setGame(g=>({...g,...next,phase:'pieIntro'}));await wait(3000);}
+    if(alive.current)setGame(g=>({...g,...next,phase:'question'}));
+  }catch(e){if(alive.current)setError(e.message+' — choose Retry question.');}
+  finally{lock.current=false;if(alive.current)setBusy(false);}
+ }
+ async function move(id){if(lock.current||!allowed.includes(id))return;const n=BOARD[id];const positions=[...game.positions];positions[game.active]=id;
+  setGame(g=>({...g,positions,phase:'landing',category:n.category||null,pie:n.kind==='pie',final:false,roll:null}));
+  if(n.kind==='roll'){setGame(g=>({...g,positions,phase:'board',roll:null}));return;}
+  if(n.kind==='hub'){setGame(g=>({...g,positions,phase:'category',final:g.wedges[g.active].length===6,roll:null}));return;}
+  await ask(n.category,n.kind==='pie');
+ }
+ async function answer(correct){if(lock.current||!game.revealed)return;lock.current=true;setBusy(true);setError('');stopSpeech();
+  try{await markAnswered(game.question.id);
+   setGame(g=>{const wedges=g.wedges.map(w=>[...w]),scores=[...g.scores];if(correct){scores[g.active]++;if(g.pie&&!wedges[g.active].includes(g.category))wedges[g.active].push(g.category);}
+    return {...g,wedges,scores,active:correct?g.active:1-g.active,phase:correct&&g.final?'winner':'board',question:null,revealed:false,pie:false,final:false,roll:null};});
+  }catch(e){setError('Could not save the answer. Please try again. '+e.message);}
+  finally{lock.current=false;setBusy(false);}
+ }
+ function reset(){if(window.confirm('Start a new game? This clears the current board and wedges.')){stopSpeech();localStorage.removeItem(SAVE);setGame(fresh());setError('');}}
+ if(game.phase==='intro')return <main className="box-stage"><h1>Trivial Pursuit</h1><p>A classic game night. Boys versus Girls.</p><div className={opening?'unboxing':'closed-box'}><img className="box-lid" src="/trivial-pursuit-box.png" alt="Trivial Pursuit game box"/>{opening&&<img className="unboxed-board" src="/trivial-pursuit-board.jpg" alt="The game board slides out of the box"/>}</div><button className="primary" disabled={opening} onClick={openBox}>{opening?"Let's Play Trivial Pursuit…":'Open the box & play'}</button></main>;
+ return <main className={`board-game ${game.active===0?'boys-turn':'girls-turn'}`}>
+  <header className="board-header"><div><span className="eyebrow">GAME NIGHT</span><h1>Trivial Pursuit</h1></div><div className="turn-label"><TokenIcon team={game.active}/> {team.name}’ turn</div><button className="quiet" onClick={reset} disabled={busy||rolling}>New game</button></header>
+  <div className="board-layout"><section className="board-table"><Board game={game} allowed={allowed} onMove={move}/></section>
+   <aside className="game-panel"><div className="team-scores">{TEAMS.map((t,i)=><div key={t.name} className={`team-score ${game.active===i?'active-team':''}`}><strong><TokenIcon team={i}/> {t.name}</strong><span>{game.scores[i]} correct</span><div className="wedge-row">{CATS.map(c=><span key={c} title={c} aria-label={`${c}: ${game.wedges[i].includes(c)?'collected':'not collected'}`} style={{background:game.wedges[i].includes(c)?COLORS[c]:'#263644',borderColor:COLORS[c]}}>◀</span>)}</div><small>{game.wedges[i].length} / 6 wedges</small></div>)}</div>
+    {error&&<div role="alert" className="error">{error}{game.phase==='landing'&&<button onClick={()=>ask(game.category,game.pie,game.final)} disabled={busy}>Retry question</button>}</div>}
+    {game.phase==='board'&&<div className="turn-controls"><Die value={die}/><h2>{game.wedges[game.active].length===6?'Bring your token back to the centre!':'Roll the die'}</h2><p>Move along the rim or take a shortcut through the centre.</p><button className="primary" onClick={roll} disabled={rolling}>{rolling?'Rolling…':'Roll die'}</button></div>}
+    {game.phase==='move'&&<div className="turn-controls"><Die value={game.roll}/><h2>Move {game.roll} spaces</h2><p>Select a glowing space on the board.</p><div className="destination-list">{allowed.map(id=><button key={id} onClick={()=>move(id)} disabled={busy}>{BOARD[id].kind==='hub'?'Centre':BOARD[id].kind==='roll'?'Roll again':BOARD[id].category}{BOARD[id].kind==='pie'?' · Wedge':''}</button>)}</div></div>}
+    {game.phase==='category'&&<div><span className="eyebrow">{game.final?'FINAL QUESTION · OPPONENT CHOOSES':'CENTRE · CHOOSE A CATEGORY'}</span><h2>{game.final?`${TEAMS[1-game.active].name}, choose their final category`:'Choose a category'}</h2><div className="category-buttons">{CATS.map(c=><button key={c} disabled={busy} style={{borderColor:COLORS[c]}} onClick={()=>ask(c,false,game.final)}>{c}</button>)}</div></div>}
+    {game.phase==='landing'&&<div><p role="status">{busy?'Finding your question…':'Your token has landed.'}</p>{!busy&&!error&&<button className="primary" onClick={()=>ask(game.category,game.pie,game.final)}>Get question</button>}</div>}
+    {game.phase==='question'&&game.question&&<section className="question-panel"><div className="question-heading"><span className="eyebrow" style={{color:COLORS[game.category]}}>{game.final?'FINAL QUESTION':game.pie?'WEDGE QUESTION':game.category}</span><button className="quiet" aria-label={speaking?'Stop narration':'Read question again'} onClick={()=>speaking?stopSpeech():say(game.question.question)}>{speaking?'Stop voice':'Read aloud'}</button></div><h2>{game.question.question}</h2>{game.revealed?<><div className="answer">{game.question.answer}</div><div className="answer-buttons"><button className="correct" disabled={busy} onClick={()=>answer(true)}>✓ Correct</button><button className="wrong" disabled={busy} onClick={()=>answer(false)}>✕ Incorrect</button></div></>:<button className="primary" disabled={busy} onClick={()=>{stopSpeech();setGame(g=>({...g,revealed:true}));}}>Reveal answer</button>}</section>}
+    <details className="board-key"><summary>Categories & board rules</summary><div>{CATS.map(c=><p key={c}><i style={{background:COLORS[c]}}/>{c}</p>)}</div><p>Glowing spaces are exactly one die roll away. No reversing within a move. A die space grants another roll. Correct answers grant another turn; incorrect answers pass the turn. Wedge spaces ask a pie question. Collect all six wedges, return to the centre, then answer a final question chosen by the other team.</p></details>
+   </aside></div>
+  {game.phase==='pieIntro'&&<div className="wedge-intro" style={{'--wedge-color':COLORS[game.category]}}><div className="big-wedge">◀</div><span className="eyebrow">FOR THE WEDGE</span><h1>{game.category}</h1><p><TokenIcon team={game.active}/> {team.name}, get ready.</p></div>}
+  {game.phase==='winner'&&<div className="winner-overlay"><h1>{team.name} win!</h1><p>Six wedges. One final answer. Game night champions.</p><button className="primary" onClick={reset}>Play again</button></div>}
+ </main>;
+}

@@ -1,5 +1,5 @@
 import React from 'react';
-import Game from './components/Game';
+import Game from './components/BoardGame';
 import AdminPanel from './pages/AdminPanel';
 
 export default function App() {
