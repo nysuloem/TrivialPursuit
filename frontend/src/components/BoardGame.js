@@ -1,3 +1,4 @@
+import {createAudioCtx,playCorrect,playIncorrect,playDiceRoll} from './game-audio';
 import React, {useState,useEffect,useRef} from 'react';
 import {getQuestion,markAnswered} from '../api';
 import {BOARD,CATS,COLORS,destinations,rollDie} from './board-rules';
@@ -53,6 +54,13 @@ function Board({game,allowed,onMove,mini=false}){
 }
 export default function BoardGame(){
  const [game,setGame]=useState(restore),[busy,setBusy]=useState(false),[error,setError]=useState(''),[opening,setOpening]=useState(false),[rolling,setRolling]=useState(false),[die,setDie]=useState(1),[speaking,setSpeaking]=useState(false);
+ const effects=useRef(null);
+ function effectsContext(){
+  if(!effects.current)effects.current=createAudioCtx();
+  if(effects.current?.state==='suspended')effects.current.resume().catch(()=>{});
+  return effects.current;
+ }
+ function feedback(correct){try{(correct?playCorrect:playIncorrect)(effectsContext());}catch(e){console.warn('Sound effect unavailable',e);}}
  const audio=useRef(null),controller=useRef(null),speechSerial=useRef(0),alive=useRef(true),lock=useRef(false);
  const team=TEAMS[game.active];
  useEffect(()=>{try{if(!['intro','opening'].includes(game.phase))localStorage.setItem(SAVE,JSON.stringify({...game,phase:game.phase==='pieIntro'?'landing':game.phase,version:1}));}catch{}},[game]);
@@ -64,11 +72,11 @@ export default function BoardGame(){
   catch(e){if(serial===speechSerial.current&&alive.current&&window.speechSynthesis){await new Promise(resolve=>{const u=new SpeechSynthesisUtterance(text);u.onend=resolve;u.onerror=resolve;window.speechSynthesis.speak(u);});}}
   finally{clearTimeout(timeout);if(url)URL.revokeObjectURL(url);if(serial===speechSerial.current&&alive.current)setSpeaking(false);}
  }
- useEffect(()=>{alive.current=true;return()=>{alive.current=false;speechSerial.current++;controller.current?.abort();audio.current?.pause();window.speechSynthesis?.cancel();};},[]);
+ useEffect(()=>{alive.current=true;return()=>{alive.current=false;speechSerial.current++;controller.current?.abort();audio.current?.pause();effects.current?.close().catch(()=>{});window.speechSynthesis?.cancel();};},[]);
  // No reading while the box or wedge overlays cover the question.
  useEffect(()=>{if(game.phase==='question'&&game.question)say(game.question.question);else stopSpeech();return()=>stopSpeech();},[game.phase,game.question?.id,game.active]); // eslint-disable-line
  async function openBox(){if(lock.current)return;lock.current=true;setOpening(true);await Promise.all([say("Let's Play Trivial Pursuit"),wait(5200)]);if(alive.current){setGame({...fresh(),phase:'board'});setOpening(false);}lock.current=false;}
- async function roll(){if(lock.current||rolling)return;lock.current=true;stopSpeech();setRolling(true);for(let i=0;i<10;i++){setDie(rollDie());await wait(80);}const n=rollDie();setDie(n);if(alive.current){setRolling(false);setGame(g=>({...g,roll:n,phase:'move'}));}lock.current=false;}
+ async function roll(){if(lock.current||rolling)return;lock.current=true;stopSpeech();try{playDiceRoll(effectsContext());}catch(e){console.warn('Dice sound unavailable',e);}setRolling(true);for(let i=0;i<10;i++){setDie(rollDie());await wait(80);}const n=rollDie();setDie(n);if(alive.current){setRolling(false);setGame(g=>({...g,roll:n,phase:'move'}));}lock.current=false;}
  const allowed=game.phase==='move'?destinations(game.positions[game.active],game.roll):[];
  async function ask(category,pie,final=false){
   if(lock.current)return;lock.current=true;setBusy(true);setError('');stopSpeech();
@@ -86,8 +94,8 @@ export default function BoardGame(){
   if(n.kind==='hub'){setGame(g=>({...g,positions,phase:'category',final:g.wedges[g.active].length===6,roll:null}));return;}
   await ask(n.category,n.kind==='pie');
  }
- async function answer(correct){if(lock.current||!game.revealed)return;lock.current=true;setBusy(true);setError('');stopSpeech();
-  try{if(!game.steal)await markAnswered(game.question.id);
+ async function answer(correct){if(lock.current||!game.revealed)return;effectsContext();lock.current=true;setBusy(true);setError('');stopSpeech();
+  try{if(!game.steal)await markAnswered(game.question.id);feedback(correct);
    setGame(g=>{
     const wedges=g.wedges.map(w=>[...w]),scores=[...g.scores];
     if(correct){
