@@ -1,5 +1,5 @@
 import {playWedgeWon,createAudioCtx,playCorrect,playIncorrect,playDiceRoll} from './game-audio';
-import React, {useState,useEffect,useRef} from 'react';
+import React, {useState,useEffect,useLayoutEffect,useRef} from 'react';
 import {getQuestion,markAnswered} from '../api';
 import {BOARD,CATS,COLORS,destinations,rollDie} from './board-rules';
 import './BoardGame.css';
@@ -19,7 +19,7 @@ function PieTracker({wedges=[],team=0,small=false}){
 function CategoryCard(){return <section className="category-card" aria-label="Category colour key"><div className="category-card-spine"><span>Trivial Pursuit</span></div><div className="category-card-list">{KEY_CATEGORIES.map(cat=><div className="category-key-row" key={cat}><i style={{background:COLORS[cat]}} aria-hidden="true"/><span>{cat}</span></div>)}</div></section>;}
 const SAVE='trivial-pursuit-board-v1';
 const fresh=()=>({phase:'intro',active:0,positions:['hub','hub'],wedges:[[],[]],scores:[0,0],roll:null,question:null,category:null,pie:false,final:false,steal:false,stealFrom:null,revealed:false,challenge:false,pendingId:null});
-function restore(){try{const g=JSON.parse(localStorage.getItem(SAVE));if(g&&g.version===1&&g.positions.every(p=>BOARD[p])&&['board','move','question','category','landing','stealPick','challengeOffer','challengePick','wedgeWin','winner'].includes(g.phase))return g;}catch{}return fresh();}
+function restore(){try{const g=JSON.parse(localStorage.getItem(SAVE));if(g&&g.version===1&&g.positions.every(p=>BOARD[p])&&['board','move','question','category','landing','stealPick','rolloff','rolloffResult','challengeOffer','challengePick','wedgeWin','winner'].includes(g.phase))return g;}catch{}return fresh();}
 const wait=ms=>new Promise(r=>setTimeout(r,ms));
 function arc(r,a){return [500+r*Math.cos(a),500+r*Math.sin(a)];}
 function cellPath(i){const a=(i-.5)*Math.PI/21,b=(i+.5)*Math.PI/21;const p=[arc(374,a),arc(466,a),arc(466,b),arc(374,b)];return `M${p[0]} L${p[1]} A466 466 0 0 1 ${p[2]} L${p[3]} A374 374 0 0 0 ${p[0]} Z`;}
@@ -54,6 +54,26 @@ function Board({game,allowed,onMove,mini=false}){
 }
 export default function BoardGame(){
  const [game,setGame]=useState(restore),[busy,setBusy]=useState(false),[error,setError]=useState(''),[opening,setOpening]=useState(false),[rolling,setRolling]=useState(false),[die,setDie]=useState(1),[speaking,setSpeaking]=useState(false);
+ const panelRef=useRef(null);
+ useLayoutEffect(()=>{
+  const root=panelRef.current;if(!root)return;
+  const fit=()=>{
+   const question=root.querySelector('.question-panel h2');if(!question)return;
+   question.style.fontSize='';
+   root.querySelector('.game-panel')?.classList.remove('long-question');
+   if(window.innerWidth<1100)return;
+   const panel=root.querySelector('.game-panel');
+   const copy=root.querySelector('.question-copy');
+   if(!panel||!copy)return;
+   const overflowing=()=>question.getBoundingClientRect().bottom>copy.getBoundingClientRect().bottom-8||panel.scrollHeight>panel.clientHeight+1;
+   if(overflowing())panel.classList.add('long-question');
+   let size=parseFloat(getComputedStyle(question).fontSize);
+   for(let i=0;i<44&&overflowing()&&size>12;i++){
+    size-=1;question.style.fontSize=size+'px';
+   }
+  };
+  fit();window.addEventListener('resize',fit);return()=>window.removeEventListener('resize',fit);
+ },[game.phase,game.question?.question,game.revealed,error]);
  const effects=useRef(null);
  function effectsContext(){
   if(!effects.current)effects.current=createAudioCtx();
@@ -90,8 +110,38 @@ export default function BoardGame(){
   return()=>{cancelled=true;stopSpeech();};
  },[game.phase,game.question?.id,game.active]); // eslint-disable-line
 
- async function openBox(){if(lock.current)return;lock.current=true;setOpening(true);await Promise.all([say("Let's Play Trivial Pursuit"),wait(5200)]);if(alive.current){setGame({...fresh(),phase:'board'});setOpening(false);}lock.current=false;}
+ async function openBox(){if(lock.current)return;lock.current=true;setOpening(true);await Promise.all([say("Let's Play Trivial Pursuit"),wait(5200)]);if(alive.current){setGame({...fresh(),phase:'rolloff'});setOpening(false);}lock.current=false;}
  async function roll(){if(lock.current||rolling)return;lock.current=true;stopSpeech();try{playDiceRoll(effectsContext());}catch(e){console.warn('Dice sound unavailable',e);}setRolling(true);for(let i=0;i<10;i++){setDie(rollDie());await wait(80);}const n=rollDie();setDie(n);if(alive.current){setRolling(false);setGame(g=>({...g,roll:n,phase:'move'}));}lock.current=false;}
+ async function firstRoll(){
+  if(lock.current)return;lock.current=true;setRolling(true);stopSpeech();
+  try{playDiceRoll(effectsContext());}catch{}
+  for(let i=0;i<10;i++){setGame(g=>({...g,startRolls:[rollDie(),rollDie()]}));await wait(90);}
+  const rolls=[rollDie(),rollDie()];
+  if(alive.current){setGame(g=>({...g,phase:'rolloffResult',startRolls:rolls,starter:rolls[0]===rolls[1]?null:rolls[0]>rolls[1]?0:1}));setRolling(false);}
+  lock.current=false;
+ }
+ async function judgePie(winner){
+  if(lock.current||!game.revealed)return;effectsContext();lock.current=true;setBusy(true);setError('');stopSpeech();
+  try{
+   await markAnswered(game.question.id);feedback(winner!==null);
+   setGame(g=>{
+    const wedges=g.wedges.map(w=>[...w]),scores=[...g.scores];
+    const active=winner===null?1-g.active:winner;
+    if(winner!==null){
+      scores[winner]++;
+      if(winner!==g.active&&wedges[winner].includes(g.category)&&wedges[g.active].length){
+        return {...g,scores,active:winner,stealFrom:g.active,phase:'stealPick',question:null,revealed:false,pie:false};
+      }
+      if(!wedges[winner].includes(g.category))wedges[winner].push(g.category);
+    }
+    const final=wedges[active].length===6;
+    return {...g,scores,wedges,active,question:null,revealed:false,pie:false,steal:false,final,
+      phase:winner===null?(final?'category':'board'):'wedgeWin',
+      afterCelebrate:final?'category':'board',celebrateCategory:g.category};
+   });
+  }catch(e){setError('Could not save the answer. Please try again. '+e.message);}
+  finally{lock.current=false;setBusy(false);}
+ }
  const allowed=game.phase==='move'?destinations(game.positions[game.active],game.roll):[];
  async function ask(category,pie,final=false,isChallenge=game.challenge){
   if(lock.current)return;lock.current=true;setBusy(true);setError('');stopSpeech();
@@ -147,10 +197,6 @@ export default function BoardGame(){
       }
       if(g.pie&&!wedges[g.active].includes(g.category))wedges[g.active].push(g.category);
     }
-    // A missed pie question gives the other team the same question to steal.
-    if(!correct&&g.pie&&!g.steal){
-      return {...g,active:1-g.active,steal:true,stealFrom:g.active,revealed:false};
-    }
     const nextActive=correct||g.steal?g.active:1-g.active;
     const finalReady=wedges[nextActive].length===6;
     return {...g,wedges,scores,active:nextActive,
@@ -172,11 +218,12 @@ export default function BoardGame(){
  }
  function reset(){if(window.confirm('Start a new game? This clears the current board and wedges.')){stopSpeech();localStorage.removeItem(SAVE);setGame(fresh());setError('');}}
  if(game.phase==='intro')return <main className="box-stage"><h1>Trivial Pursuit</h1><p>A classic game night. Boys versus Girls.</p><div className={opening?'unboxing':'closed-box'}><img className="box-lid" src="/trivial-pursuit-box.webp" alt="Trivial Pursuit game box"/>{opening&&<img className="unboxed-board" src="/trivial-pursuit-board.webp" alt="The game board slides out of the box"/>}</div><button className="primary" disabled={opening} onClick={openBox}>{opening?"Let's Play Trivial Pursuit…":'Open the box & play'}</button></main>;
- return <main className={`board-game ${game.active===0?'boys-turn':'girls-turn'}`}>
+ return <main ref={panelRef} className={`board-game ${game.active===0?'boys-turn':'girls-turn'}`}>
   <header className="board-header"><div><span className="eyebrow">GAME NIGHT</span><h1>Trivial Pursuit</h1></div><div className="turn-label"><TokenIcon team={game.active}/> {team.name}’ turn</div><button className="quiet" onClick={reset} disabled={busy||rolling}>New game</button></header>
   <div className="board-layout"><section className="board-table"><Board game={game} allowed={allowed} onMove={move}/></section>
    <aside className="game-panel"><div className="team-scores">{TEAMS.map((t,i)=><div key={t.name} className={`team-score ${game.active===i?'active-team':''}`}><strong><TokenIcon team={i}/> {t.name}</strong><span>{game.scores[i]} correct</span><PieTracker wedges={game.wedges[i]} team={i}/><small>{game.wedges[i].length} / 6 wedges</small></div>)}</div>
     {error&&<div role="alert" className="error">{error}{game.phase==='landing'&&<button onClick={()=>ask(game.category,game.pie,game.final)} disabled={busy}>Retry question</button>}</div>}
+    {(game.phase==='rolloff'||game.phase==='rolloffResult')&&<section className="rolloff-panel"><span className="eyebrow">WHO GOES FIRST?</span><h2>Highest roll starts</h2><div className="rolloff-dice">{TEAMS.map((t,i)=><div key={t.name}><strong>{t.name}</strong><Die value={game.startRolls?.[i]||1}/></div>)}</div>{game.phase==='rolloffResult'&&<h2 role="status">{game.starter===null?'A tie! Roll again.':`${TEAMS[game.starter].name} go first!`}</h2>}{game.phase==='rolloff'||game.starter===null?<button className="primary" disabled={rolling} onClick={firstRoll}>{rolling?'Rolling…':'Roll to see who starts'}</button>:<button className="primary" onClick={()=>setGame(g=>({...g,active:g.starter,phase:'board'}))}>Start game</button>}</section>}
     {game.phase==='board'&&<div className="turn-controls"><Die value={die}/><h2>{'Roll the die'}</h2><p>Move along the rim or take a shortcut through the centre.</p><button className="primary" onClick={roll} disabled={rolling}>{rolling?'Rolling…':'Roll die'}</button></div>}
     {game.phase==='move'&&<div className="turn-controls"><Die value={game.roll}/><h2>Move {game.roll} spaces</h2><p>Select a glowing space on the board.</p></div>}
     {game.phase==='challengeOffer'&&<section className="challenge-offer"><span className="eyebrow">SAME SPACE · CHALLENGE OPPORTUNITY</span><h2>{team.name}, do you want to challenge?</h2><p>Get it right: choose one of their pies to discard. Get it wrong: they choose one of yours to discard. No pies are transferred.</p><div className="answer-buttons"><button className="correct" disabled={busy} onClick={()=>resolveLanding(game.pendingId,true)}>Challenge!</button><button disabled={busy} onClick={()=>resolveLanding(game.pendingId,false)}>No challenge</button></div></section>}
@@ -184,7 +231,7 @@ export default function BoardGame(){
     {game.phase==='stealPick'&&<div><span className="eyebrow">BONUS STEAL</span><h2>You already have that pie. Choose an opponent’s pie to steal.</h2><div className="category-buttons">{game.wedges[game.stealFrom].map(c=><button key={c} style={{borderColor:COLORS[c]}} onClick={()=>stealWedge(c)}>{c}</button>)}</div></div>}
     {game.phase==='category'&&<div><span className="eyebrow">{game.final?'FINAL QUESTION · OPPONENT CHOOSES':'CENTRE SPACE'}</span><h2>{game.final?`${TEAMS[1-game.active].name}, choose their final category`:'Which colour will you play?'}</h2><div className="category-buttons">{CATS.map(c=><button key={c} disabled={busy} style={{borderColor:COLORS[c]}} onClick={()=>ask(c,false,game.final)}>{c}</button>)}</div></div>}
     {game.phase==='landing'&&<div><p role="status">{busy?'Finding your question…':'Your token has landed.'}</p>{!busy&&!error&&<button className="primary" onClick={()=>ask(game.category,game.pie,game.final)}>Get question</button>}</div>}
-    {game.phase==='question'&&game.question&&<section className="question-panel"><div className="question-heading"><span className="eyebrow" style={{color:COLORS[game.category]}}>{game.challenge?'CHALLENGE QUESTION':game.final?'FINAL QUESTION':game.steal?'STEAL · '+game.category:game.pie?'WEDGE QUESTION':game.category}</span><button className="quiet" aria-label={speaking?'Stop narration':'Read question again'} onClick={()=>speaking?stopSpeech():say(game.question.question)}>{speaking?'Stop voice':'Read aloud'}</button></div><h2>{game.question.question}</h2>{game.revealed?<><div className="answer">{game.question.answer}</div><div className="answer-buttons"><button className="correct" disabled={busy} onClick={()=>answer(true)}>✓ Correct</button><button className="wrong" disabled={busy} onClick={()=>answer(false)}>✕ Incorrect</button></div></>:<button className="primary" disabled={busy} onClick={()=>{stopSpeech();setGame(g=>({...g,revealed:true}));}}>Reveal answer</button>}</section>}
+    {game.phase==='question'&&game.question&&<section className="question-panel"><div className="question-copy"><div className="question-heading"><span className="eyebrow" style={{color:COLORS[game.category]}}>{game.challenge?'CHALLENGE QUESTION':game.final?'FINAL QUESTION':game.steal?'STEAL · '+game.category:game.pie?'WEDGE QUESTION':game.category}</span><button className="quiet" aria-label={speaking?'Stop narration':'Read question again'} onClick={()=>speaking?stopSpeech():say(game.question.question)}>{speaking?'Stop voice':'Read aloud'}</button></div><h2>{game.question.question}</h2></div>{game.revealed?<><div className="answer">{game.question.answer}</div>{game.pie&&!game.challenge?<div className="pie-judging"><button className="correct" disabled={busy} onClick={()=>judgePie(game.active)}>{team.name} got it right. Win pie!</button><button className="steal" disabled={busy} onClick={()=>judgePie(1-game.active)}>{TEAMS[1-game.active].name} got it right. Steal pie!</button><button className="wrong" disabled={busy} onClick={()=>judgePie(null)}>Both wrong — no pie</button></div>:<div className="answer-buttons"><button className="correct" disabled={busy} onClick={()=>answer(true)}>✓ Correct</button><button className="wrong" disabled={busy} onClick={()=>answer(false)}>✕ Incorrect</button></div>}</>:<button className="primary" disabled={busy} onClick={()=>{stopSpeech();setGame(g=>({...g,revealed:true}));}}>Reveal answer</button>}</section>}
 
     <CategoryCard/>
     <details className="board-key"><summary>Board rules</summary><p>Glowing spaces are exactly one die roll away. No reversing within a move. A die space grants another roll. Correct answers grant another turn; incorrect answers pass the turn. Wedge spaces ask a pie question. Land on your opponent to optionally challenge them: the winner chooses one of the loser’s pies to discard. A missed pie question can be stolen by the other team. If they already own that pie, they can take one of the opponent’s pies instead. Collect all six wedges to immediately enter the final round; the other team chooses your category. A correct final answer wins. A wrong final answer passes the turn; you keep your pies.</p></details>
