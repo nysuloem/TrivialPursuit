@@ -264,7 +264,7 @@ function StealCelebration({ team, category, onDone }) {
           position:'absolute',
           left: `${15 + i * 14}%`,
           top: '-20px',
-          fontSize: 16,
+          fontSize:'clamp(16px,1.667vw,32px)',
           animation: `confettiFall ${1.5 + i * 0.2}s ${i * 0.1}s ease-in forwards`,
         }}>{dot}</div>
       ))}
@@ -288,10 +288,10 @@ function StealCelebration({ team, category, onDone }) {
             STOLEN! 🎉
           </div>
           <div style={{ textAlign: 'center' }}>
-            <div style={{ fontSize: 15, color: team.color, fontFamily: 'monospace', letterSpacing: 2 }}>
+            <div style={{ fontSize:'clamp(15px,1.562vw,30px)', color: team.color, fontFamily: 'monospace', letterSpacing: 2 }}>
               {team.emoji} {team.label.toUpperCase()}
             </div>
-            <div style={{ fontSize: 12, color: '#555', fontFamily: 'monospace', marginTop: 4 }}>
+            <div style={{ fontSize:'clamp(12px,1.250vw,24px)', color:'#cbd5e1', fontFamily: 'monospace', marginTop: 4 }}>
               {CAT_EMOJI[category]} {category} WEDGE STOLEN!
             </div>
           </div>
@@ -333,7 +333,7 @@ function LuckyPieAnnounce({ team, category, onDone }) {
           {['10%','20%','80%','90%','50%','30%','70%'].map((left, i) => (
             <div key={i} style={{
               position:'absolute', left, top: `${10 + i*12}%`,
-              fontSize:20, animation:`starSpin 0.6s ${i*0.1}s ease both`,
+              fontSize:'clamp(20px,2.083vw,40px)', animation:`starSpin 0.6s ${i*0.1}s ease both`,
             }}>⭐</div>
           ))}
         </div>
@@ -361,10 +361,10 @@ function LuckyPieAnnounce({ team, category, onDone }) {
         <div style={{
           textAlign:'center', animation:'slideUp 0.4s ease forwards',
         }}>
-          <div style={{ fontSize:16, color: CAT_COLORS[category], fontFamily:'monospace', letterSpacing:2 }}>
+          <div style={{ fontSize:'clamp(16px,1.667vw,32px)', color: CAT_COLORS[category], fontFamily:'monospace', letterSpacing:2 }}>
             {CAT_EMOJI[category]} {category}
           </div>
-          <div style={{ fontSize:13, color:'#555', fontFamily:'monospace', marginTop:6 }}>
+          <div style={{ fontSize:'clamp(13px,1.354vw,26px)', color:'#cbd5e1', fontFamily:'monospace', marginTop:6 }}>
             {team.emoji} {team.label.toUpperCase()} — YOUR LUCKY SHOT!
           </div>
         </div>
@@ -435,7 +435,7 @@ function IntroScene({ onDone }) {
             color: '#fff', letterSpacing: -1, fontFamily: 'Georgia,serif',
           }}>TRIVIAL PURSUIT</div>
           <div style={{
-            fontSize: 14, color: '#fbbf24', fontFamily: 'monospace',
+            fontSize:'clamp(14px,1.458vw,28px)', color: '#fbbf24', fontFamily: 'monospace',
             letterSpacing: 4, animation: 'tapPulse 1.5s ease infinite',
           }}>► TAP TO START</div>
         </div>
@@ -452,7 +452,7 @@ function IntroScene({ onDone }) {
             onClick={onDone}
             style={{
               padding: '16px 56px', borderRadius: 12, cursor: 'pointer',
-              fontSize: 18, fontFamily: 'monospace', letterSpacing: 4, fontWeight: 900,
+              fontSize:'clamp(18px,1.875vw,36px)', fontFamily: 'monospace', letterSpacing: 4, fontWeight: 900,
               border: '2px solid #fbbf24', background: '#fbbf2415', color: '#fbbf24',
               animation: 'playPulse 1.5s ease infinite',
             }}
@@ -503,7 +503,7 @@ function PieIntro({ category, teamIdx, onDone }) {
           animation: 'slideUp 0.4s ease forwards',
           textAlign: 'center',
         }}>
-          <div style={{ fontSize: 13, letterSpacing: 6, color: color, fontFamily: 'monospace', marginBottom: 6 }}>
+          <div style={{ fontSize:'clamp(13px,1.354vw,26px)', letterSpacing: 6, color: color, fontFamily: 'monospace', marginBottom: 6 }}>
             PIE QUESTION
           </div>
           <div style={{
@@ -519,7 +519,7 @@ function PieIntro({ category, teamIdx, onDone }) {
       {step >= 2 && (
         <div style={{
           animation: 'slideUp 0.3s ease forwards',
-          fontSize: 13, color: TEAMS[teamIdx].color, fontFamily: 'monospace', letterSpacing: 3,
+          fontSize:'clamp(13px,1.354vw,26px)', color: TEAMS[teamIdx].color, fontFamily: 'monospace', letterSpacing: 3,
         }}>
           {TEAMS[teamIdx].emoji} {TEAMS[teamIdx].label.toUpperCase()} — ANSWER FOR THE WEDGE!
         </div>
@@ -652,10 +652,10 @@ function PieWinCelebration({ category, teamIdx, onDone }) {
         }}>
           {team.emoji} {team.label.toUpperCase()}
         </div>
-        <div style={{ fontSize: 20, color: color, fontFamily: 'monospace', letterSpacing: 3, marginTop: 8 }}>
+        <div style={{ fontSize:'clamp(20px,2.083vw,40px)', color: color, fontFamily: 'monospace', letterSpacing: 3, marginTop: 8 }}>
           WINS THE {CAT_EMOJI[category]} {category.toUpperCase()} WEDGE!
         </div>
-        <div style={{ fontSize: 13, color: '#444', fontFamily: 'monospace', marginTop: 16 }}>
+        <div style={{ fontSize:'clamp(13px,1.354vw,26px)', color:'#cbd5e1', fontFamily: 'monospace', marginTop: 16 }}>
           continuing in 3 seconds...
         </div>
       </div>
@@ -751,7 +751,7 @@ function DiceRoll({ onDone }) {
       `}</style>
 
       <div style={{ textAlign:'center' }}>
-        <div style={{ fontSize:13, letterSpacing:6, color:'#444', fontFamily:'monospace', marginBottom:8 }}>WHO GOES FIRST?</div>
+        <div style={{ fontSize:'clamp(13px,1.354vw,26px)', letterSpacing:6, color:'#cbd5e1', fontFamily:'monospace', marginBottom:8 }}>WHO GOES FIRST?</div>
         <div style={{ fontSize:'clamp(28px,6vw,44px)', fontWeight:900, color:'#fff' }}>ROLL THE DICE</div>
       </div>
 
@@ -759,7 +759,7 @@ function DiceRoll({ onDone }) {
       <div style={{ display:'flex', gap:48, alignItems:'center' }}>
         {TEAMS.map((team, i) => (
           <div key={i} style={{ textAlign:'center', display:'flex', flexDirection:'column', alignItems:'center', gap:12 }}>
-            <div style={{ fontSize:14, color:team.color, fontFamily:'monospace', letterSpacing:2 }}>
+            <div style={{ fontSize:'clamp(14px,1.458vw,28px)', color:team.color, fontFamily:'monospace', letterSpacing:2 }}>
               {team.emoji} {team.label.toUpperCase()}
             </div>
             <div style={{
@@ -777,7 +777,7 @@ function DiceRoll({ onDone }) {
             </div>
             {phase === 'result' && rolls[i] !== null && (
               <div style={{
-                fontSize:22, fontWeight:900,
+                fontSize:'clamp(22px,2.292vw,44px)', fontWeight:900,
                 color: winner === i ? team.color : '#333',
                 fontFamily:'monospace',
               }}>
@@ -792,9 +792,9 @@ function DiceRoll({ onDone }) {
       {phase === 'result' && (
         <div style={{ textAlign:'center', animation:'winGlow 1s ease infinite' }}>
           {winner === 'tie' ? (
-            <div style={{ color:'#fbbf24', fontSize:20, fontWeight:700 }}>🤝 TIE! ROLL AGAIN!</div>
+            <div style={{ color:'#fbbf24', fontSize:'clamp(20px,2.083vw,40px)', fontWeight:700 }}>🤝 TIE! ROLL AGAIN!</div>
           ) : (
-            <div style={{ color:TEAMS[winner].color, fontSize:24, fontWeight:900 }}>
+            <div style={{ color:TEAMS[winner].color, fontSize:'clamp(24px,2.500vw,48px)', fontWeight:900 }}>
               {TEAMS[winner].emoji} {TEAMS[winner].label.toUpperCase()} GOES FIRST!
             </div>
           )}
@@ -805,17 +805,17 @@ function DiceRoll({ onDone }) {
       {phase === 'idle' && (
         <button onClick={doRoll} style={{
           padding:'16px 48px', borderRadius:12, cursor:'pointer',
-          fontSize:16, fontFamily:'monospace', letterSpacing:3, fontWeight:700,
+          fontSize:'clamp(16px,1.667vw,32px)', fontFamily:'monospace', letterSpacing:3, fontWeight:700,
           border:'2px solid #fbbf24', background:'#fbbf2415', color:'#fbbf24',
         }}>🎲 ROLL DICE</button>
       )}
       {phase === 'rolling' && (
-        <div style={{ color:'#444', fontFamily:'monospace', fontSize:13, letterSpacing:2 }}>ROLLING...</div>
+        <div style={{ color:'#cbd5e1', fontFamily:'monospace', fontSize:'clamp(13px,1.354vw,26px)', letterSpacing:2 }}>ROLLING...</div>
       )}
       {phase === 'result' && (
         <button onClick={handleContinue} style={{
           padding:'16px 48px', borderRadius:12, cursor:'pointer',
-          fontSize:16, fontFamily:'monospace', letterSpacing:3, fontWeight:700,
+          fontSize:'clamp(16px,1.667vw,32px)', fontFamily:'monospace', letterSpacing:3, fontWeight:700,
           border:`2px solid ${winner === 'tie' ? '#fbbf24' : TEAMS[winner]?.color || '#fff'}`,
           background: winner === 'tie' ? '#fbbf2415' : `${TEAMS[winner]?.color}15`,
           color: winner === 'tie' ? '#fbbf24' : TEAMS[winner]?.color || '#fff',
@@ -843,7 +843,7 @@ function CategorySplash({ category, teamIdx, onReady }) {
 
   return (
     <div style={{
-      width:'100%', maxWidth:540,
+      width:'100%', maxWidth:1200,
       borderRadius:12, overflow:'hidden',
       border:`2px solid ${color}55`,
       background:`${color}10`,
@@ -867,7 +867,7 @@ function CategorySplash({ category, teamIdx, onReady }) {
 
       {step >= 1 && (
         <div style={{
-          fontSize:22, fontWeight:900, color,
+          fontSize:'clamp(22px,2.292vw,44px)', fontWeight:900, color,
           textAlign:'center', animation:'splashTitle 0.3s ease forwards',
         }}>
           {category}
@@ -876,7 +876,7 @@ function CategorySplash({ category, teamIdx, onReady }) {
 
       {step >= 2 && (
         <div style={{
-          fontSize:11, color:team.color, fontFamily:'monospace', letterSpacing:2,
+          fontSize:'clamp(11px,1.250vw,24px)', color:team.color, fontFamily:'monospace', letterSpacing:2,
           animation:'splashTeam 0.3s ease forwards',
         }}>
           {team.emoji} {team.label.toUpperCase()}'S QUESTION
@@ -924,7 +924,7 @@ function StealScreen({ stealingTeamIdx, category, question, onCorrect, onWrong }
 
   return (
     <div style={{
-      position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.95)',
+      position: 'fixed', inset: 0, background: stealingTeamIdx === 0 ? '#164fa3' : '#b52b71',
       display: 'flex', flexDirection: 'column', alignItems: 'center',
       justifyContent: 'center', padding: 20, zIndex: 100, gap: 16,
     }}>
@@ -934,8 +934,8 @@ function StealScreen({ stealingTeamIdx, category, question, onCorrect, onWrong }
 
       {/* Header */}
       <div style={{ textAlign: 'center' }}>
-        <div style={{ fontSize: 36, marginBottom: 8 }}>🕵️</div>
-        <div style={{ fontSize: 11, letterSpacing: 6, color: '#f97316', fontFamily: 'monospace', marginBottom: 4 }}>
+        <div style={{ fontSize:'clamp(36px,3.750vw,72px)', marginBottom: 8 }}>🕵️</div>
+        <div style={{ fontSize:'clamp(11px,1.250vw,24px)', letterSpacing: 6, color: '#f97316', fontFamily: 'monospace', marginBottom: 4 }}>
           STEAL OPPORTUNITY
         </div>
         <div style={{
@@ -944,23 +944,23 @@ function StealScreen({ stealingTeamIdx, category, question, onCorrect, onWrong }
         }}>
           {team.emoji} {team.label.toUpperCase()}
         </div>
-        <div style={{ fontSize: 11, color: '#555', fontFamily: 'monospace', marginTop: 4 }}>
+        <div style={{ fontSize:'clamp(11px,1.250vw,24px)', color:'#cbd5e1', fontFamily: 'monospace', marginTop: 4 }}>
           Answer correctly to steal the wedge + get a bonus turn!
         </div>
       </div>
 
       {/* Question card */}
       <div style={{
-        width: '100%', maxWidth: 520,
+        width: '100%', maxWidth:1200,
         background: '#111',
         border: `2px solid ${color}55`,
         borderLeft: `4px solid ${color}`,
         borderRadius: 10, padding: '18px 16px',
       }}>
-        <div style={{ fontSize: 9, color: '#f97316', fontFamily: 'monospace', letterSpacing: 2, marginBottom: 12 }}>
+        <div style={{ fontSize:'clamp(9px,1.250vw,24px)', color: '#f97316', fontFamily: 'monospace', letterSpacing: 2, marginBottom: 12 }}>
           🥧 {category.toUpperCase()} — SAME QUESTION
         </div>
-        <div style={{ fontSize: 'clamp(13px,2.4vw,16px)', color: '#fffbeb', lineHeight: 1.7, marginBottom: 14 }}>
+        <div style={{ fontSize: 'clamp(26px,2.8vw,54px)', color: '#fffbeb', lineHeight: 1.7, marginBottom: 14 }}>
           {question.question}
         </div>
 
@@ -971,8 +971,8 @@ function StealScreen({ stealingTeamIdx, category, question, onCorrect, onWrong }
           cursor: revealed ? 'default' : 'pointer',
         }}>
           {revealed
-            ? <div style={{ color: '#fff', fontSize: 14, fontWeight: 600 }}>{question.answer}</div>
-            : <div style={{ color: '#1c1c1c', fontSize: 10, fontFamily: 'monospace', letterSpacing: 3 }}>▸ TAP TO REVEAL</div>
+            ? <div style={{ color: '#fff', fontSize:'clamp(14px,1.458vw,28px)', fontWeight: 600 }}>{question.answer}</div>
+            : <div style={{ color:'#cbd5e1', fontSize:'clamp(10px,1.250vw,24px)', fontFamily: 'monospace', letterSpacing: 3 }}>▸ TAP TO REVEAL</div>
           }
         </div>
 
@@ -980,16 +980,16 @@ function StealScreen({ stealingTeamIdx, category, question, onCorrect, onWrong }
           <button onClick={() => setRevealed(true)} style={{
             width: '100%', padding: '10px', borderRadius: 7, cursor: 'pointer',
             border: `1px solid ${color}44`, background: `${color}0d`,
-            color: color, fontSize: 11, fontFamily: 'monospace', letterSpacing: 2,
+            color: color, fontSize:'clamp(11px,1.250vw,24px)', fontFamily: 'monospace', letterSpacing: 2,
           }}>REVEAL ANSWER</button>
         ) : (
           <div style={{ display: 'flex', gap: 7 }}>
             <button onClick={onCorrect} style={{
-              flex: 1, padding: '10px', borderRadius: 7, cursor: 'pointer', fontSize: 11, fontFamily: 'monospace',
+              flex: 1, padding: '10px', borderRadius: 7, cursor: 'pointer', fontSize:'clamp(11px,1.250vw,24px)', fontFamily: 'monospace',
               border: '1px solid #14532d', background: 'rgba(34,197,94,0.07)', color: '#4ade80',
             }}>✓ CORRECT · STEAL WEDGE + BONUS TURN</button>
             <button onClick={onWrong} style={{
-              flex: 1, padding: '10px', borderRadius: 7, cursor: 'pointer', fontSize: 11, fontFamily: 'monospace',
+              flex: 1, padding: '10px', borderRadius: 7, cursor: 'pointer', fontSize:'clamp(11px,1.250vw,24px)', fontFamily: 'monospace',
               border: '1px solid #7f1d1d', background: 'rgba(239,68,68,0.07)', color: '#f87171',
             }}>✗ WRONG · NO STEAL</button>
           </div>
@@ -1011,6 +1011,17 @@ export default function Game() {
     if (audioCtxRef.current?.state === 'suspended') audioCtxRef.current.resume();
     return audioCtxRef.current;
   };
+
+  useEffect(() => {
+    const previousMargin = document.body.style.margin;
+    const previousBackground = document.body.style.background;
+    document.body.style.margin = '0';
+    document.body.style.background = '#0a0a0a';
+    return () => {
+      document.body.style.margin = previousMargin;
+      document.body.style.background = previousBackground;
+    };
+  }, []);
 
   const [state,      setState]      = useState(S.INTRO);
   const [active,     setActive]     = useState(0); // will be set by dice roll
@@ -1104,7 +1115,7 @@ export default function Game() {
 
   // Auto-read question aloud when new question loads — uses pre-fetched audio
   useEffect(() => {
-    if (!question?.question) return;
+    if (!question?.question || ![S.QUESTION, S.PIE, S.FINAL].includes(state)) return;
     let cancelled = false;
     const teamAtLoad = active; // capture active team at question load time
 
@@ -1112,10 +1123,11 @@ export default function Game() {
       try {
         let url = null;
         if (pendingAudioRef.current) {
-          url = await pendingAudioRef.current;
-          pendingAudioRef.current = null;
+          const pending = pendingAudioRef.current;
+          url = await pending;
+          if (pendingAudioRef.current === pending) pendingAudioRef.current = null;
         }
-        if (cancelled) return;
+        if (cancelled) { if (url) URL.revokeObjectURL(url); return; }
 
         if (url) {
           if (currentAudio) { currentAudio.pause(); currentAudio = null; }
@@ -1135,7 +1147,7 @@ export default function Game() {
 
     const timer = setTimeout(playWhenReady, 100);
     return () => { cancelled = true; clearTimeout(timer); stopTTS(); };
-  }, [question]); // eslint-disable-line
+  }, [question, state]); // eslint-disable-line
 
   const triggerFlash = (type) => {
     setFlash(type);
@@ -1478,11 +1490,11 @@ export default function Game() {
         `}</style>
         <div style={{ fontSize:48 }}>🕵️</div>
         <div style={{ textAlign:'center' }}>
-          <div style={{ fontSize:11, letterSpacing:4, color:'#f97316', fontFamily:'monospace' }}>BONUS STEAL!</div>
+          <div style={{ fontSize:'clamp(11px,1.250vw,24px)', letterSpacing:4, color:'#f97316', fontFamily:'monospace' }}>BONUS STEAL!</div>
           <div style={{ fontSize:'clamp(20px,4vw,28px)', fontWeight:900, color:TEAMS[active].color, marginTop:4 }}>
             {TEAMS[active].emoji} {TEAMS[active].label.toUpperCase()}
           </div>
-          <div style={{ fontSize:13, color:'#555', fontFamily:'monospace', marginTop:6 }}>
+          <div style={{ fontSize:'clamp(13px,1.354vw,26px)', color:'#cbd5e1', fontFamily:'monospace', marginTop:6 }}>
             You already have that wedge. Pick one from {TEAMS[losingTeam].label}!
           </div>
         </div>
@@ -1496,14 +1508,14 @@ export default function Game() {
               display:'flex', flexDirection:'column', alignItems:'center', gap:6,
               animation:'pickPulse 1.5s ease infinite',
             }}>
-              <span style={{ fontSize:32, filter:`drop-shadow(0 0 8px ${CAT_COLORS[cat]})` }}>{CAT_EMOJI[cat]}</span>
-              <span style={{ fontSize:11, color:CAT_COLORS[cat], fontFamily:'monospace', fontWeight:700, textAlign:'center', lineHeight:1.3 }}>{cat}</span>
+              <span style={{ fontSize:'clamp(32px,3.333vw,64px)', filter:`drop-shadow(0 0 8px ${CAT_COLORS[cat]})` }}>{CAT_EMOJI[cat]}</span>
+              <span style={{ fontSize:'clamp(11px,1.250vw,24px)', color:CAT_COLORS[cat], fontFamily:'monospace', fontWeight:700, textAlign:'center', lineHeight:1.3 }}>{cat}</span>
             </button>
           ))}
         </div>
 
         {opponentWedges.length === 0 && (
-          <div style={{ color:'#555', fontFamily:'monospace', fontSize:13 }}>
+          <div style={{ color:'#cbd5e1', fontFamily:'monospace', fontSize:'clamp(13px,1.354vw,26px)' }}>
             Opponent has no wedges to steal!
           </div>
         )}
@@ -1547,7 +1559,7 @@ export default function Game() {
             position:'absolute',
             left:`${Math.random()*100}%`,
             top:`${Math.random()*100}%`,
-            fontSize: 16 + Math.random()*24,
+            fontSize:'clamp(16px,1.667vw,32px)' + Math.random()*24,
             animation:`starFloat ${2+Math.random()*2}s ${Math.random()*2}s ease-in-out infinite`,
             opacity: 0.3 + Math.random()*0.4,
           }}>⭐</div>
@@ -1556,7 +1568,7 @@ export default function Game() {
         <div style={{ textAlign:'center', display:'flex', flexDirection:'column', alignItems:'center', gap:20, zIndex:10 }}>
           <div style={{ fontSize:80, animation:'trophySpin 2s ease-in-out' }}>🏆</div>
 
-          <div style={{ fontSize:13, letterSpacing:8, color:TEAMS[winner].color, fontFamily:'monospace', animation:'winnerPop 0.6s ease both' }}>
+          <div style={{ fontSize:'clamp(13px,1.354vw,26px)', letterSpacing:8, color:TEAMS[winner].color, fontFamily:'monospace', animation:'winnerPop 0.6s ease both' }}>
             CHAMPION
           </div>
 
@@ -1568,7 +1580,7 @@ export default function Game() {
             {TEAMS[winner].emoji} {TEAMS[winner].label.toUpperCase()}
           </div>
 
-          <div style={{ fontSize:14, color:'#555', fontFamily:'monospace', letterSpacing:2 }}>
+          <div style={{ fontSize:'clamp(14px,1.458vw,28px)', color:'#cbd5e1', fontFamily:'monospace', letterSpacing:2 }}>
             ALL {CATEGORIES.length} WEDGES + FINAL QUESTION ANSWERED
           </div>
 
@@ -1577,9 +1589,9 @@ export default function Game() {
           <div style={{ display:'flex', gap:40, marginTop:8 }}>
             {TEAMS.map((t,i) => (
               <div key={i} style={{ textAlign:'center', opacity: i === winner ? 1 : 0.4 }}>
-                <div style={{ color:t.color, fontSize:13, fontFamily:'monospace' }}>{t.emoji} {t.label.toUpperCase()}</div>
-                <div style={{ color:'#fff', fontSize:32, fontWeight:900, fontFamily:'monospace' }}>{scores[i]}</div>
-                <div style={{ color:'#555', fontSize:11, fontFamily:'monospace' }}>{wedges[i].length}/{CATEGORIES.length} wedges</div>
+                <div style={{ color:t.color, fontSize:'clamp(13px,1.354vw,26px)', fontFamily:'monospace' }}>{t.emoji} {t.label.toUpperCase()}</div>
+                <div style={{ color:'#fff', fontSize:'clamp(32px,3.333vw,64px)', fontWeight:900, fontFamily:'monospace' }}>{scores[i]}</div>
+                <div style={{ color:'#cbd5e1', fontSize:'clamp(11px,1.250vw,24px)', fontFamily:'monospace' }}>{wedges[i].length}/{CATEGORIES.length} wedges</div>
               </div>
             ))}
           </div>
@@ -1589,13 +1601,13 @@ export default function Game() {
             border:`2px solid ${TEAMS[winner].color}`,
             background:`${TEAMS[winner].color}18`,
             color:TEAMS[winner].color, cursor:'pointer',
-            fontFamily:'monospace', fontSize:14, letterSpacing:3,
+            fontFamily:'monospace', fontSize:'clamp(14px,1.458vw,28px)', letterSpacing:3,
             fontWeight:700,
           }}>↺ PLAY AGAIN</button>
 
           {/* Questions used this game */}
           <div style={{ marginTop:16, maxWidth:400, width:'100%', background:'#0d0d0d', border:'1px solid #1a1a1a', borderRadius:8, padding:'12px 16px' }}>
-            <div style={{ fontSize:9, color:'#333', fontFamily:'monospace', textAlign:'center', letterSpacing:2, marginBottom:10 }}>
+            <div style={{ fontSize:'clamp(9px,1.250vw,24px)', color:'#cbd5e1', fontFamily:'monospace', textAlign:'center', letterSpacing:2, marginBottom:10 }}>
               QUESTIONS USED THIS GAME · {Object.values(questionsUsed).reduce((a,b)=>a+b,0)} TOTAL
             </div>
             {CATEGORIES.map(cat => {
@@ -1603,7 +1615,7 @@ export default function Game() {
               const max = Math.max(...Object.values(questionsUsed), 1);
               return (
                 <div key={cat} style={{ display:'flex', alignItems:'center', gap:8, marginBottom:5 }}>
-                  <span style={{ fontSize:12 }}>{CAT_EMOJI[cat]}</span>
+                  <span style={{ fontSize:'clamp(12px,1.250vw,24px)' }}>{CAT_EMOJI[cat]}</span>
                   <div style={{ flex:1, height:4, background:'#1a1a1a', borderRadius:2, overflow:'hidden' }}>
                     <div style={{
                       height:'100%',
@@ -1613,7 +1625,7 @@ export default function Game() {
                       transition:'width 0.6s ease',
                     }} />
                   </div>
-                  <span style={{ fontSize:10, color:'#444', fontFamily:'monospace', minWidth:16, textAlign:'right' }}>{count}</span>
+                  <span style={{ fontSize:'clamp(10px,1.250vw,24px)', color:'#cbd5e1', fontFamily:'monospace', minWidth:16, textAlign:'right' }}>{count}</span>
                 </div>
               );
             })}
@@ -1628,13 +1640,20 @@ export default function Game() {
   const currentStreak = streak[active];
 
   return (
-    <div style={{
+    <div className="tp-game" style={{
       ...css.page,
-      background: chosenCat && (state === S.QUESTION || state === S.PIE || state === S.FINAL || state === S.CAT_SPLASH)
-        ? `radial-gradient(ellipse at center, ${CAT_COLORS[chosenCat]}18 0%, #0a0a0a 65%)`
-        : '#0a0a0a',
+      background: active === 0 ? '#164fa3' : '#b52b71',
       transition: 'background 0.8s ease',
     }}>
+      <style>{`
+        @media (min-width: 1200px) {
+          .tp-game { display: grid !important; grid-template-columns: 320px minmax(0, 1fr); gap: 20px 32px; align-content: start; align-items: start !important; }
+          .tp-game > * { grid-column: 1 / -1; }
+          .tp-game .tp-scores { grid-column: 1; grid-row: 2; flex-direction: column; margin: 0 !important; }
+          .tp-game .tp-play { grid-column: 2; grid-row: 2; max-width: none !important; min-width: 0; box-sizing: border-box; }
+          .tp-game .tp-streaks { display: grid !important; grid-template-columns: 1fr 1fr; column-gap: 12px !important; }
+        }
+      `}</style>
       {/* Pie intro overlay */}
       {state === S.PIE_INTRO && chosenCat && (
         <PieIntro category={chosenCat} teamIdx={active} onDone={handlePieIntroDone} />
@@ -1660,19 +1679,19 @@ export default function Game() {
       <div style={{ textAlign:'center', marginBottom:16 }}>
         <h1 style={{ fontSize:'clamp(28px,6vw,48px)', color:'#fff', margin:0, fontWeight:900, letterSpacing:-1 }}>TRIVIAL PURSUIT</h1>
         {bankCount !== null && (
-          <div style={{ fontSize:12, color: bankCount < 100 ? '#ef4444' : '#555', fontFamily:'monospace', marginTop:4 }}>
+          <div style={{ fontSize:'clamp(12px,1.250vw,24px)', color: bankCount < 100 ? '#ef4444' : '#555', fontFamily:'monospace', marginTop:4 }}>
             {bankCount} questions in bank{bankCount < 250 ? ' · refilling...' : ''}
           </div>
         )}
         {/* Voice selector */}
         <div style={{ marginTop:8, display:'flex', alignItems:'center', justifyContent:'center', gap:8 }}>
-          <span style={{ fontSize:10, color:'#444', fontFamily:'monospace' }}>🔊 VOICE:</span>
+          <span style={{ fontSize:'clamp(10px,1.250vw,24px)', color:'#cbd5e1', fontFamily:'monospace' }}>🔊 VOICE:</span>
           <select
             value={selectedVoice}
             onChange={e => { setSelectedVoice(e.target.value); stopTTS(); setSpeaking(false); }}
             style={{
               background:'#111', border:'1px solid #222', borderRadius:4,
-              color:'#888', fontSize:10, fontFamily:'monospace', padding:'3px 8px',
+              color:'#888', fontSize:'clamp(10px,1.250vw,24px)', fontFamily:'monospace', padding:'3px 8px',
               cursor:'pointer', maxWidth:240,
             }}
           >
@@ -1685,7 +1704,7 @@ export default function Game() {
       </div>
 
       {/* Scoreboards */}
-      <div style={{ display:'flex', width:'100%', maxWidth:600, gap:10, marginBottom:16 }}>
+      <div className="tp-scores" style={{ display:'flex', width:'100%', maxWidth:1200, gap:10, marginBottom:16 }}>
         {TEAMS.map((t, i) => (
           <div key={i} style={{
             flex:1, background:'#111', borderRadius:12, padding:'14px 10px',
@@ -1693,54 +1712,54 @@ export default function Game() {
             borderBottom:`4px solid ${active===i ? t.color : '#1c1c1c'}`,
             display:'flex', flexDirection:'column', alignItems:'center', gap:6,
           }}>
-            <div style={{ fontSize:16, color:active===i?'#fff':'#333', fontFamily:'monospace', fontWeight:700 }}>{t.emoji} {t.label.toUpperCase()}</div>
-            <div style={{ fontSize:32, fontWeight:900, color:active===i?t.color:'#2a2a2a', fontFamily:'monospace' }}>{scores[i]}</div>
+            <div style={{ fontSize:'clamp(16px,1.667vw,32px)', color:active===i?'#fff':'#cbd5e1', fontFamily:'monospace', fontWeight:700 }}>{t.emoji} {t.label.toUpperCase()}</div>
+            <div style={{ fontSize:'clamp(32px,3.333vw,64px)', fontWeight:900, color:active===i?t.color:'#2a2a2a', fontFamily:'monospace' }}>{scores[i]}</div>
             <PieDisplay wedges={wedges[i]} size={100} />
-            <div style={{ fontSize:11, color:'#444', fontFamily:'monospace' }}>{wedges[i].length}/{CATEGORIES.length} wedges</div>
+            <div style={{ fontSize:'clamp(11px,1.250vw,24px)', color:'#cbd5e1', fontFamily:'monospace' }}>{wedges[i].length}/{CATEGORIES.length} wedges</div>
             {/* Per-category streak tracker */}
-            <div style={{ width:'100%', display:'flex', flexDirection:'column', gap:4, marginTop:2 }}>
+            <div className="tp-streaks" style={{ width:'100%', display:'flex', flexDirection:'column', gap:4, marginTop:2 }}>
               {CATEGORIES.map(cat => {
                 const owned = wedges[i].includes(cat);
                 const s = streak[i][cat] || 0;
                 const pieReady = s >= STREAK_NEEDED && !owned;
                 return (
                   <div key={cat} style={{ display:'flex', alignItems:'center', gap:6, opacity: owned ? 0.35 : 1 }}>
-                    <span style={{ fontSize:16, minWidth:22 }}>{CAT_EMOJI[cat]}</span>
+                    <span style={{ fontSize:'clamp(16px,1.667vw,32px)', minWidth:22 }}>{CAT_EMOJI[cat]}</span>
                     <div style={{ flex:1, height:6, background:'#1a1a1a', borderRadius:3, overflow:'hidden' }}>
                       <div style={{ height:'100%', width: owned ? '100%' : `${Math.min((s/STREAK_NEEDED)*100,100)}%`, background: owned ? '#333' : pieReady ? '#fbbf24' : t.color, borderRadius:3, transition:'width 0.4s' }} />
                     </div>
-                    {owned && <span style={{ fontSize:11, color:'#444' }}>✓</span>}
-                    {pieReady && !owned && <span style={{ fontSize:13 }}>🥧</span>}
-                    {!owned && s > 0 && !pieReady && <span style={{ fontSize:10, color:t.color, fontFamily:'monospace', minWidth:24 }}>{s}/{STREAK_NEEDED}</span>}
+                    {owned && <span style={{ fontSize:'clamp(11px,1.250vw,24px)', color:'#cbd5e1' }}>✓</span>}
+                    {pieReady && !owned && <span style={{ fontSize:'clamp(13px,1.354vw,26px)' }}>🥧</span>}
+                    {!owned && s > 0 && !pieReady && <span style={{ fontSize:'clamp(10px,1.250vw,24px)', color:t.color, fontFamily:'monospace', minWidth:24 }}>{s}/{STREAK_NEEDED}</span>}
                   </div>
                 );
               })}
             </div>
-            {active===i && <div style={{ fontSize:10, color:t.color+'88', fontFamily:'monospace', letterSpacing:1, marginTop:2 }}>▸ PLAYING</div>}
+            {active===i && <div style={{ fontSize:'clamp(10px,1.250vw,24px)', color:t.color+'88', fontFamily:'monospace', letterSpacing:1, marginTop:2 }}>▸ PLAYING</div>}
           </div>
         ))}
       </div>
 
       {error && (
-        <div style={{ color:'#f87171', fontFamily:'monospace', fontSize:12, marginBottom:10, textAlign:'center' }}>
-          ⚠ {error} <button onClick={() => loadCategoryOptions(active, wedges)} style={{ marginLeft:8, color:'#888', background:'none', border:'none', cursor:'pointer', fontFamily:'monospace', fontSize:11 }}>retry</button>
+        <div style={{ color:'#f87171', fontFamily:'monospace', fontSize:'clamp(12px,1.250vw,24px)', marginBottom:10, textAlign:'center' }}>
+          ⚠ {error} <button onClick={() => loadCategoryOptions(active, wedges)} style={{ marginLeft:8, color:'#888', background:'none', border:'none', cursor:'pointer', fontFamily:'monospace', fontSize:'clamp(11px,1.250vw,24px)' }}>retry</button>
         </div>
       )}
-      {loading && <div style={{ color:'#333', fontFamily:'monospace', fontSize:11, marginBottom:10 }}>Loading...</div>}
+      {loading && <div style={{ color:'#cbd5e1', fontFamily:'monospace', fontSize:'clamp(11px,1.250vw,24px)', marginBottom:10 }}>Loading...</div>}
 
       {/* ── FINAL PICK — opponent chooses category for final question ── */}
       {state === S.FINAL_PICK && finalTeam !== null && (
-        <div style={{ width:'100%', maxWidth:540 }}>
+        <div className="tp-play" style={{ width:'100%', maxWidth:1200 }}>
           <div style={{ textAlign:'center', marginBottom:20, padding:'16px', background:'#fbbf2410', border:'1px solid #fbbf2444', borderRadius:10 }}>
-            <div style={{ fontSize:32, marginBottom:8 }}>🏆</div>
-            <div style={{ color:'#fbbf24', fontSize:18, fontWeight:700, marginBottom:6 }}>
+            <div style={{ fontSize:'clamp(32px,3.333vw,64px)', marginBottom:8 }}>🏆</div>
+            <div style={{ color:'#fbbf24', fontSize:'clamp(18px,1.875vw,36px)', fontWeight:700, marginBottom:6 }}>
               {TEAMS[finalTeam].emoji} {TEAMS[finalTeam].label} HAS ALL 6 WEDGES!
             </div>
-            <div style={{ color:'#888', fontSize:13, fontFamily:'monospace' }}>
+            <div style={{ color:'#888', fontSize:'clamp(13px,1.354vw,26px)', fontFamily:'monospace' }}>
               {TEAMS[1-finalTeam].label.toUpperCase()} — PICK THE FINAL QUESTION CATEGORY
             </div>
             {finalUsedCats.length > 0 && (
-              <div style={{ color:'#555', fontSize:11, fontFamily:'monospace', marginTop:6 }}>
+              <div style={{ color:'#cbd5e1', fontSize:'clamp(11px,1.250vw,24px)', fontFamily:'monospace', marginTop:6 }}>
                 Already used: {finalUsedCats.join(', ')}
               </div>
             )}
@@ -1759,9 +1778,9 @@ export default function Game() {
                   textAlign:'center', display:'flex', flexDirection:'column',
                   alignItems:'center', gap:8, opacity: alreadyUsed ? 0.4 : 1,
                 }}>
-                  <span style={{ fontSize:32 }}>{CAT_EMOJI[cat]}</span>
-                  <div style={{ fontSize:10, fontWeight:700, color: alreadyUsed ? '#333' : CAT_COLORS[cat], lineHeight:1.3 }}>{cat}</div>
-                  {alreadyUsed && <div style={{ fontSize:9, color:'#444', fontFamily:'monospace' }}>used</div>}
+                  <span style={{ fontSize:'clamp(32px,3.333vw,64px)' }}>{CAT_EMOJI[cat]}</span>
+                  <div style={{ fontSize:'clamp(10px,1.250vw,24px)', fontWeight:700, color: alreadyUsed ? '#333' : CAT_COLORS[cat], lineHeight:1.3 }}>{cat}</div>
+                  {alreadyUsed && <div style={{ fontSize:'clamp(9px,1.250vw,24px)', color:'#cbd5e1', fontFamily:'monospace' }}>used</div>}
                 </button>
               );
             })}
@@ -1776,9 +1795,9 @@ export default function Game() {
 
       {/* ── CHOOSING ── */}
       {state === S.CHOOSING && !loading && (
-        <div style={{ width:'100%', maxWidth:540 }}>
+        <div className="tp-play" style={{ width:'100%', maxWidth:1200 }}>
           <div style={{ textAlign:'center', marginBottom:14 }}>
-            <div style={{ color:TEAMS[active].color, fontSize:12, fontFamily:'monospace', letterSpacing:2 }}>
+            <div style={{ color:TEAMS[active].color, fontSize:'clamp(12px,1.250vw,24px)', fontFamily:'monospace', letterSpacing:2 }}>
               {TEAMS[active].emoji} {TEAMS[active].label.toUpperCase()} — CHOOSE A CATEGORY
             </div>
           </div>
@@ -1794,10 +1813,10 @@ export default function Game() {
                     color:'#fff', cursor:'pointer', textAlign:'left',
                     display:'flex', alignItems:'center', gap:16,
                   }}>
-                    <span style={{ fontSize:36 }}>🎲</span>
+                    <span style={{ fontSize:'clamp(36px,3.750vw,72px)' }}>🎲</span>
                     <div>
-                      <div style={{ fontSize:16, fontWeight:700, color:'#ec4899' }}>Roll Again!</div>
-                      <div style={{ fontSize:13, color:'#555', fontFamily:'monospace', marginTop:4 }}>tap to get two new categories</div>
+                      <div style={{ fontSize:'clamp(16px,1.667vw,32px)', fontWeight:700, color:'#ec4899' }}>Roll Again!</div>
+                      <div style={{ fontSize:'clamp(13px,1.354vw,26px)', color:'#cbd5e1', fontFamily:'monospace', marginTop:4 }}>tap to get two new categories</div>
                     </div>
                   </button>
                 );
@@ -1815,10 +1834,10 @@ export default function Game() {
                   color:'#fff', cursor:'pointer', textAlign:'left',
                   display:'flex', alignItems:'center', gap:16,
                 }}>
-                  <span style={{ fontSize:36 }}>{CAT_EMOJI[cat]}</span>
+                  <span style={{ fontSize:'clamp(36px,3.750vw,72px)' }}>{CAT_EMOJI[cat]}</span>
                   <div style={{ flex:1 }}>
-                    <div style={{ fontSize:16, fontWeight:700, color: pieReady ? '#fbbf24' : CAT_COLORS[cat], lineHeight:1.2 }}>{cat}</div>
-                    <div style={{ fontSize:13, color:'#555', fontFamily:'monospace', marginTop:4 }}>
+                    <div style={{ fontSize:'clamp(16px,1.667vw,32px)', fontWeight:700, color: pieReady ? '#fbbf24' : CAT_COLORS[cat], lineHeight:1.2 }}>{cat}</div>
+                    <div style={{ fontSize:'clamp(13px,1.354vw,26px)', color:'#cbd5e1', fontFamily:'monospace', marginTop:4 }}>
                       {alreadyOwned ? '✓ wedge owned'
                         : pieReady ? '🥧 PIE QUESTION READY!'
                         : streakInCat > 0 ? `🔥 ${streakInCat}/${STREAK_NEEDED} — one more for pie!`
@@ -1826,7 +1845,7 @@ export default function Game() {
                     </div>
                   </div>
                   {showLuckyChance && (
-                    <div style={{ textAlign:'center', fontSize:10, color:'#fbbf2488', fontFamily:'monospace' }}>
+                    <div style={{ textAlign:'center', fontSize:'clamp(10px,1.250vw,24px)', color:'#fbbf2488', fontFamily:'monospace' }}>
                       🎲 {Math.round(randomChance * 100)}%<br/>lucky pie
                     </div>
                   )}
@@ -1839,8 +1858,8 @@ export default function Game() {
 
       {/* ── QUESTION / PIE QUESTION / FINAL QUESTION ── */}
       {(state === S.QUESTION || state === S.PIE || state === S.FINAL) && question && (
-        <div style={{
-          width:'100%', maxWidth:540,
+        <div className="tp-play" style={{
+          width:'100%', maxWidth:1200,
           background: flash==='correct' ? '#0a1a0a' : flash==='wrong' ? '#1a0a0a' : isPieState ? '#100e08' : '#111',
           border:`1px solid ${isPieState ? '#fbbf2433' : catData?.color+'1a'}`,
           borderLeft:`4px solid ${isPieState ? '#fbbf24' : catData?.color}`,
@@ -1848,7 +1867,7 @@ export default function Game() {
           transition:'background 0.3s',
         }}>
           <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:12 }}>
-            <div style={{ fontSize:9, color: state===S.FINAL ? '#fbbf24' : isPieState?'#fbbf24':catData?.color, fontFamily:'monospace', letterSpacing:2, textTransform:'uppercase' }}>
+            <div style={{ fontSize:'clamp(9px,1.250vw,24px)', color: state===S.FINAL ? '#fbbf24' : isPieState?'#fbbf24':catData?.color, fontFamily:'monospace', letterSpacing:2, textTransform:'uppercase' }}>
               {state===S.FINAL ? '🏆 FINAL QUESTION' : isPieState ? '🥧 PIE QUESTION' : `${catData?.emoji} ${chosenCat}`}
             </div>
             <div style={{ display:'flex', gap:8, alignItems:'center' }}>
@@ -1864,16 +1883,16 @@ export default function Game() {
                   border:`1px solid ${speaking ? '#ef4444' : '#333'}`,
                   background: speaking ? 'rgba(239,68,68,0.1)' : 'transparent',
                   color: speaking ? '#ef4444' : '#555',
-                  cursor:'pointer', fontSize:16, lineHeight:1,
+                  cursor:'pointer', fontSize:'clamp(16px,1.667vw,32px)', lineHeight:1,
                 }}
               >{speaking ? '🔇' : '🔁'}</button>
-              {question.canadian && <div style={{ fontSize:8, color:'#cc000099', fontFamily:'monospace' }}>🍁</div>}
+              {question.canadian && <div style={{ fontSize:'clamp(8px,1.250vw,24px)', color:'#cc000099', fontFamily:'monospace' }}>🍁</div>}
               <button onClick={handleSkip} disabled={loading} style={{
                 padding:'4px 12px', borderRadius:4,
                 border:`1px solid ${isPieState ? '#fbbf2444' : '#2a2a2a'}`,
                 background: isPieState ? '#fbbf2410' : 'transparent',
                 color: isPieState ? '#fbbf2499' : '#555',
-                cursor:'pointer', fontSize:10,
+                cursor:'pointer', fontSize:'clamp(10px,1.250vw,24px)',
                 fontFamily:'monospace', letterSpacing:1,
               }}>
                 ⟳ SKIP
@@ -1881,7 +1900,7 @@ export default function Game() {
             </div>
           </div>
 
-          <div style={{ fontSize:'clamp(18px,3vw,24px)', color:isPieState?'#fffbeb':'#ddd', lineHeight:1.7, marginBottom:18, minHeight:60 }}>
+          <div style={{ fontSize:'clamp(26px,2.8vw,54px)', color:isPieState?'#fffbeb':'#ddd', lineHeight:1.35, marginBottom:24, minHeight:60 }}>
             {question.question}
           </div>
 
@@ -1892,25 +1911,25 @@ export default function Game() {
             cursor:revealed?'default':'pointer', transition:'all 0.2s',
           }}>
             {revealed
-              ? <div style={{ color:'#fff', fontSize:20, fontWeight:600, lineHeight:1.55 }}>{question.answer}</div>
-              : <div style={{ color:'#1c1c1c', fontSize:12, fontFamily:'monospace', letterSpacing:3 }}>▸ TAP TO REVEAL ANSWER</div>
+              ? <div style={{ color:'#fff', fontSize:'clamp(20px,2.083vw,40px)', fontWeight:600, lineHeight:1.55 }}>{question.answer}</div>
+              : <div style={{ color:'#cbd5e1', fontSize:'clamp(12px,1.250vw,24px)', fontFamily:'monospace', letterSpacing:3 }}>▸ TAP TO REVEAL ANSWER</div>
             }
           </div>
 
           {!revealed ? (
             <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
               {isPieState && (
-                <div style={{ textAlign:'center', padding:'10px 14px', borderRadius:7, background:'#fbbf2408', border:'1px solid #fbbf2422', color:'#fbbf24', fontSize:13, fontFamily:'monospace', letterSpacing:1 }}>
+                <div style={{ textAlign:'center', padding:'10px 14px', borderRadius:7, background:'#fbbf2408', border:'1px solid #fbbf2422', color:'#fbbf24', fontSize:'clamp(13px,1.354vw,26px)', fontFamily:'monospace', letterSpacing:1 }}>
                   ⚠ OTHER TEAM — DECLARE STEAL NOW BEFORE REVEALING
                 </div>
               )}
               {state === S.FINAL && (
-                <div style={{ textAlign:'center', padding:'10px 14px', borderRadius:7, background:'#fbbf2408', border:'1px solid #fbbf2422', color:'#fbbf24', fontSize:13, fontFamily:'monospace', letterSpacing:1 }}>
+                <div style={{ textAlign:'center', padding:'10px 14px', borderRadius:7, background:'#fbbf2408', border:'1px solid #fbbf2422', color:'#fbbf24', fontSize:'clamp(13px,1.354vw,26px)', fontFamily:'monospace', letterSpacing:1 }}>
                   🏆 {TEAMS[active].label.toUpperCase()} — ANSWER TO WIN THE GAME!
                 </div>
               )}
               <button onClick={() => setRevealed(true)} style={{
-                width:'100%', padding:'14px', borderRadius:7, cursor:'pointer', fontSize:15, fontFamily:'monospace', letterSpacing:2,
+                width:'100%', padding:'14px', borderRadius:7, cursor:'pointer', fontSize:'clamp(15px,1.562vw,30px)', fontFamily:'monospace', letterSpacing:2,
                 border:`1px solid ${(isPieState||state===S.FINAL)?'#fbbf2433':catData?.color+'33'}`,
                 background:(isPieState||state===S.FINAL)?'#fbbf2408':`${catData?.color}08`,
                 color:(isPieState||state===S.FINAL)?'#fbbf24':catData?.color,
@@ -1918,21 +1937,21 @@ export default function Game() {
             </div>
           ) : state === S.FINAL ? (
             <div style={{ display:'flex', gap:8 }}>
-              <button onClick={handleCorrect} disabled={loading} style={{ flex:1, padding:'14px', borderRadius:7, cursor:'pointer', fontSize:15, fontFamily:'monospace', border:'1px solid #14532d', background:'rgba(34,197,94,0.07)', color:'#4ade80' }}>
+              <button onClick={handleCorrect} disabled={loading} style={{ flex:1, padding:'14px', borderRadius:7, cursor:'pointer', fontSize:'clamp(15px,1.562vw,30px)', fontFamily:'monospace', border:'1px solid #14532d', background:'rgba(34,197,94,0.07)', color:'#4ade80' }}>
                 ✓ CORRECT · WIN THE GAME 🏆
               </button>
-              <button onClick={handleWrong} disabled={loading} style={{ flex:1, padding:'14px', borderRadius:7, cursor:'pointer', fontSize:15, fontFamily:'monospace', border:'1px solid #7f1d1d', background:'rgba(239,68,68,0.07)', color:'#f87171' }}>
+              <button onClick={handleWrong} disabled={loading} style={{ flex:1, padding:'14px', borderRadius:7, cursor:'pointer', fontSize:'clamp(15px,1.562vw,30px)', fontFamily:'monospace', border:'1px solid #7f1d1d', background:'rgba(239,68,68,0.07)', color:'#f87171' }}>
                 ✗ WRONG · GAME CONTINUES
               </button>
             </div>
           ) : isPieState ? (
             <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
               <button onClick={handleCorrect} disabled={loading} style={{
-                width:'100%', padding:'14px', borderRadius:7, cursor:'pointer', fontSize:15, fontFamily:'monospace',
+                width:'100%', padding:'14px', borderRadius:7, cursor:'pointer', fontSize:'clamp(15px,1.562vw,30px)', fontFamily:'monospace',
                 border:'1px solid #14532d', background:'rgba(34,197,94,0.07)', color:'#4ade80',
               }}>✓ {TEAMS[active].label.toUpperCase()} GOT IT · WIN WEDGE</button>
               <button onClick={handleStealCorrect} disabled={loading} style={{
-                width:'100%', padding:'14px', borderRadius:7, cursor:'pointer', fontSize:15, fontFamily:'monospace',
+                width:'100%', padding:'14px', borderRadius:7, cursor:'pointer', fontSize:'clamp(15px,1.562vw,30px)', fontFamily:'monospace',
                 border:'1px solid #1d4ed8', background:'rgba(59,130,246,0.07)', color:'#60a5fa',
               }}>✓ STEAL CORRECT · {TEAMS[1-active].label.toUpperCase()} WIN WEDGE + BONUS</button>
               <button onClick={async () => {
@@ -1942,16 +1961,16 @@ export default function Game() {
                 setActive(a => 1 - a);
                 await loadCategoryOptions();
               }} disabled={loading} style={{
-                width:'100%', padding:'14px', borderRadius:7, cursor:'pointer', fontSize:15, fontFamily:'monospace',
+                width:'100%', padding:'14px', borderRadius:7, cursor:'pointer', fontSize:'clamp(15px,1.562vw,30px)', fontFamily:'monospace',
                 border:'1px solid #7f1d1d', background:'rgba(239,68,68,0.07)', color:'#f87171',
               }}>✗ BOTH WRONG · NO WEDGE · SWITCH</button>
             </div>
           ) : (
             <div style={{ display:'flex', gap:8 }}>
-              <button onClick={handleCorrect} disabled={loading} style={{ flex:1, padding:'14px', borderRadius:7, cursor:'pointer', fontSize:15, fontFamily:'monospace', border:'1px solid #14532d', background:'rgba(34,197,94,0.07)', color:'#4ade80' }}>
+              <button onClick={handleCorrect} disabled={loading} style={{ flex:1, padding:'14px', borderRadius:7, cursor:'pointer', fontSize:'clamp(15px,1.562vw,30px)', fontFamily:'monospace', border:'1px solid #14532d', background:'rgba(34,197,94,0.07)', color:'#4ade80' }}>
                 ✓ CORRECT · KEEP GOING
               </button>
-              <button onClick={handleWrong} disabled={loading} style={{ flex:1, padding:'14px', borderRadius:7, cursor:'pointer', fontSize:15, fontFamily:'monospace', border:'1px solid #7f1d1d', background:'rgba(239,68,68,0.07)', color:'#f87171' }}>
+              <button onClick={handleWrong} disabled={loading} style={{ flex:1, padding:'14px', borderRadius:7, cursor:'pointer', fontSize:'clamp(15px,1.562vw,30px)', fontFamily:'monospace', border:'1px solid #7f1d1d', background:'rgba(239,68,68,0.07)', color:'#f87171' }}>
                 ✗ WRONG · SWITCH
               </button>
             </div>
@@ -1960,8 +1979,8 @@ export default function Game() {
       )}
 
       {/* Question Bank */}
-      <div style={{ marginTop:12, maxWidth:540, width:'100%', padding:'10px 14px', borderRadius:7, background:'#0d0d0d', border:'1px solid #131313' }}>
-        <div style={{ fontSize:9, color:'#333', fontFamily:'monospace', textAlign:'center', marginBottom:6, letterSpacing:2 }}>
+      <div style={{ marginTop:12, maxWidth:1200, width:'100%', padding:'10px 14px', borderRadius:7, background:'#0d0d0d', border:'1px solid #131313' }}>
+        <div style={{ fontSize:'clamp(9px,1.250vw,24px)', color:'#cbd5e1', fontFamily:'monospace', textAlign:'center', marginBottom:6, letterSpacing:2 }}>
           QUESTION BANK · {bankCount !== null ? bankCount : '—'} TOTAL{bankCount < 250 ? ' · REFILLING...' : ''}
         </div>
         <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'3px 10px' }}>
@@ -1970,7 +1989,7 @@ export default function Game() {
             const low = count < 50;
             return (
               <div key={cat} style={{ display:'flex', alignItems:'center', gap:5 }}>
-                <span style={{ fontSize:10 }}>{CAT_EMOJI[cat]}</span>
+                <span style={{ fontSize:'clamp(10px,1.250vw,24px)' }}>{CAT_EMOJI[cat]}</span>
                 <div style={{ flex:1, height:3, background:'#1a1a1a', borderRadius:2, overflow:'hidden' }}>
                   <div style={{
                     height:'100%',
@@ -1979,7 +1998,7 @@ export default function Game() {
                     borderRadius:2,
                   }} />
                 </div>
-                <span style={{ fontSize:9, color: low ? '#ef4444' : '#2a2a2a', fontFamily:'monospace', minWidth:24, textAlign:'right' }}>
+                <span style={{ fontSize:'clamp(9px,1.250vw,24px)', color: low ? '#ef4444' : '#2a2a2a', fontFamily:'monospace', minWidth:24, textAlign:'right' }}>
                   {count}
                 </span>
               </div>
@@ -1988,7 +2007,7 @@ export default function Game() {
         </div>
       </div>
 
-      <button onClick={() => window.location.reload()} style={{ marginTop:12, padding:'5px 14px', borderRadius:4, border:'1px solid #181818', background:'transparent', color:'#222', cursor:'pointer', fontFamily:'monospace', fontSize:9 }}>
+      <button onClick={() => window.location.reload()} style={{ marginTop:12, padding:'5px 14px', borderRadius:4, border:'1px solid #181818', background:'transparent', color:'#cbd5e1', cursor:'pointer', fontFamily:'monospace', fontSize:'clamp(9px,1.250vw,24px)' }}>
         ↺ RESET
       </button>
     </div>
@@ -1996,6 +2015,6 @@ export default function Game() {
 }
 
 const css = {
-  page: { minHeight:'100vh', fontFamily:'Georgia,serif', display:'flex', flexDirection:'column', alignItems:'center', padding:'12px 10px 40px' },
-  btn:  (color) => ({ padding:'11px 28px', borderRadius:8, border:`1px solid ${color}`, background:'#111', color:'#aaa', cursor:'pointer', fontFamily:'monospace', fontSize:12, letterSpacing:2 }),
+  page: { minHeight:'100vh', fontFamily:'Georgia,serif', display:'flex', flexDirection:'column', alignItems:'center', padding:'clamp(16px,2vw,38px)', boxSizing:'border-box', width:'100%' },
+  btn:  (color) => ({ padding:'11px 28px', borderRadius:8, border:`1px solid ${color}`, background:'#111', color:'#aaa', cursor:'pointer', fontFamily:'monospace', fontSize:'clamp(12px,1.250vw,24px)', letterSpacing:2 }),
 };
