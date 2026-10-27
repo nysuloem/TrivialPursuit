@@ -1,4 +1,4 @@
-import {createAudioCtx,playCorrect,playIncorrect,playDiceRoll} from './game-audio';
+import {playWedgeWon,createAudioCtx,playCorrect,playIncorrect,playDiceRoll} from './game-audio';
 import React, {useState,useEffect,useRef} from 'react';
 import {getQuestion,markAnswered} from '../api';
 import {BOARD,CATS,COLORS,destinations,rollDie} from './board-rules';
@@ -18,8 +18,8 @@ function PieTracker({wedges=[],team=0,small=false}){
 }
 function CategoryCard(){return <section className="category-card" aria-label="Category colour key"><div className="category-card-spine"><span>Trivial Pursuit</span></div><div className="category-card-list">{KEY_CATEGORIES.map(cat=><div className="category-key-row" key={cat}><i style={{background:COLORS[cat]}} aria-hidden="true"/><span>{cat}</span></div>)}</div></section>;}
 const SAVE='trivial-pursuit-board-v1';
-const fresh=()=>({phase:'intro',active:0,positions:['hub','hub'],wedges:[[],[]],scores:[0,0],roll:null,question:null,category:null,pie:false,final:false,steal:false,stealFrom:null,revealed:false});
-function restore(){try{const g=JSON.parse(localStorage.getItem(SAVE));if(g&&g.version===1&&g.positions.every(p=>BOARD[p])&&['board','move','question','category','landing','stealPick','winner'].includes(g.phase))return g;}catch{}return fresh();}
+const fresh=()=>({phase:'intro',active:0,positions:['hub','hub'],wedges:[[],[]],scores:[0,0],roll:null,question:null,category:null,pie:false,final:false,steal:false,stealFrom:null,revealed:false,challenge:false,pendingId:null});
+function restore(){try{const g=JSON.parse(localStorage.getItem(SAVE));if(g&&g.version===1&&g.positions.every(p=>BOARD[p])&&['board','move','question','category','landing','stealPick','challengeOffer','challengePick','wedgeWin','winner'].includes(g.phase))return g;}catch{}return fresh();}
 const wait=ms=>new Promise(r=>setTimeout(r,ms));
 function arc(r,a){return [500+r*Math.cos(a),500+r*Math.sin(a)];}
 function cellPath(i){const a=(i-.5)*Math.PI/21,b=(i+.5)*Math.PI/21;const p=[arc(374,a),arc(466,a),arc(466,b),arc(374,b)];return `M${p[0]} L${p[1]} A466 466 0 0 1 ${p[2]} L${p[3]} A374 374 0 0 0 ${p[0]} Z`;}
@@ -40,7 +40,7 @@ function Board({game,allowed,onMove,mini=false}){
   </g>
   {Object.values(BOARD).filter(n=>n.id!=='hub').map(node=>{
     const lit=targets.has(node.id),fill=node.kind==='roll'?'#dbe3e6':COLORS[node.category];
-    return <g key={node.id} {...accessible(node)} className={lit?'board-space legal-space':'board-space'}>
+    return <g key={node.id} {...accessible(node)} className={lit?`board-space legal-space ${node.kind==='pie'&&!game.wedges[game.active].includes(node.category)?'missing-pie-option':''}`:'board-space'}>
       {node.id[0]==='r'?<path d={cellPath(+node.id.slice(1))} fill={lit?fill:'transparent'} stroke={lit?'#fffbd2':'#0c2330'} strokeWidth={lit?7:0}/>:<rect x={node.x-28} y={node.y-27} width="56" height="54" transform={`rotate(${node.angle*180/Math.PI},${node.x},${node.y})`} fill={lit?fill:'transparent'} stroke={lit?'#fffbd2':'#0c2330'} strokeWidth={lit?7:0}/>}
       {node.kind==='pie'&&<g opacity={lit?1:0}><circle cx={node.x} cy={node.y} r="25" fill="#142733" stroke="#f1e9c9" strokeWidth="2"/>{Array.from({length:6},(_,j)=><line key={j} x1={node.x} y1={node.y} x2={node.x+23*Math.cos(j*Math.PI/3)} y2={node.y+23*Math.sin(j*Math.PI/3)} stroke="#eee" strokeWidth="2"/>)}</g>}
       {node.kind==='roll'&&lit&&<text x={node.x} y={node.y+13} textAnchor="middle" fill="#183140" fontSize="39">⚄</text>}
@@ -65,39 +65,81 @@ export default function BoardGame(){
  const team=TEAMS[game.active];
  useEffect(()=>{try{if(!['intro','opening'].includes(game.phase))localStorage.setItem(SAVE,JSON.stringify({...game,phase:game.phase==='pieIntro'?'landing':game.phase,version:1}));}catch{}},[game]);
  function stopSpeech(){speechSerial.current++;controller.current?.abort();audio.current?.pause();audio.current=null;if(window.speechSynthesis)window.speechSynthesis.cancel();setSpeaking(false);}
- async function say(text){
+ async function say(text,excited=false){
   stopSpeech();const serial=speechSerial.current;const abort=new AbortController();controller.current=abort;const timeout=setTimeout(()=>abort.abort(),12000);setSpeaking(true);
   let url;
-  try{const r=await fetch(`${process.env.REACT_APP_API_URL||''}/api/tts`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text,voice:game.active===0?'onyx':'nova'}),signal:abort.signal});if(!r.ok)throw Error('Speech unavailable');url=URL.createObjectURL(await r.blob());if(serial!==speechSerial.current)return;const a=new Audio(url);audio.current=a;await new Promise((resolve,reject)=>{a.onended=resolve;a.onerror=reject;a.play().catch(reject);});}
-  catch(e){if(serial===speechSerial.current&&alive.current&&window.speechSynthesis){await new Promise(resolve=>{const u=new SpeechSynthesisUtterance(text);u.onend=resolve;u.onerror=resolve;window.speechSynthesis.speak(u);});}}
+  try{const r=await fetch(`${process.env.REACT_APP_API_URL||''}/api/tts`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({text,voice:game.active===0?'onyx':'nova',announcement:excited}),signal:abort.signal});if(!r.ok)throw Error('Speech unavailable');url=URL.createObjectURL(await r.blob());if(serial!==speechSerial.current)return;const a=new Audio(url);audio.current=a;await new Promise((resolve,reject)=>{a.onended=resolve;a.onerror=reject;a.play().catch(reject);});}
+  catch(e){if(serial===speechSerial.current&&alive.current&&window.speechSynthesis){await new Promise(resolve=>{const u=new SpeechSynthesisUtterance(text);u.volume=1;u.pitch=excited?1.3:1;u.rate=excited?1.1:1;u.onend=resolve;u.onerror=resolve;window.speechSynthesis.speak(u);});}}
   finally{clearTimeout(timeout);if(url)URL.revokeObjectURL(url);if(serial===speechSerial.current&&alive.current)setSpeaking(false);}
  }
  useEffect(()=>{alive.current=true;return()=>{alive.current=false;speechSerial.current++;controller.current?.abort();audio.current?.pause();effects.current?.close().catch(()=>{});window.speechSynthesis?.cancel();};},[]);
  // No reading while the box or wedge overlays cover the question.
- useEffect(()=>{if(game.phase==='question'&&game.question)say(game.question.question);else stopSpeech();return()=>stopSpeech();},[game.phase,game.question?.id,game.active]); // eslint-disable-line
+ useEffect(()=>{
+  let cancelled=false;
+  if(game.phase==='question'&&game.question)say(game.question.question);
+  else if(game.phase==='challengeOffer')say(`${TEAMS[game.active].name}, do you want to challenge?`);
+  else if(game.phase==='pieIntro'){
+    Promise.all([say(`Pie Question for the ${TEAMS[game.active].name}!`,true),wait(3000)]).then(()=>{
+      if(!cancelled&&alive.current)setGame(g=>({...g,phase:'question'}));
+    });
+  }else if(game.phase==='wedgeWin'){
+    stopSpeech();try{playWedgeWon(effectsContext());}catch{}
+    const timer=setTimeout(()=>{if(!cancelled)setGame(g=>({...g,phase:g.afterCelebrate||'board'}));},3500);
+    return()=>{cancelled=true;clearTimeout(timer);stopSpeech();};
+  }else stopSpeech();
+  return()=>{cancelled=true;stopSpeech();};
+ },[game.phase,game.question?.id,game.active]); // eslint-disable-line
+
  async function openBox(){if(lock.current)return;lock.current=true;setOpening(true);await Promise.all([say("Let's Play Trivial Pursuit"),wait(5200)]);if(alive.current){setGame({...fresh(),phase:'board'});setOpening(false);}lock.current=false;}
  async function roll(){if(lock.current||rolling)return;lock.current=true;stopSpeech();try{playDiceRoll(effectsContext());}catch(e){console.warn('Dice sound unavailable',e);}setRolling(true);for(let i=0;i<10;i++){setDie(rollDie());await wait(80);}const n=rollDie();setDie(n);if(alive.current){setRolling(false);setGame(g=>({...g,roll:n,phase:'move'}));}lock.current=false;}
  const allowed=game.phase==='move'?destinations(game.positions[game.active],game.roll):[];
- async function ask(category,pie,final=false){
+ async function ask(category,pie,final=false,isChallenge=game.challenge){
   if(lock.current)return;lock.current=true;setBusy(true);setError('');stopSpeech();
   try{const data=await getQuestion(category,pie);if(!data.question)throw Error('No question returned');if(pie&&data.fallbackFromPie)throw Error('No pie question is available for '+category+'. Add pie questions to this category, then retry');
     // Keep landing data for retry if the bank request fails.
-    const next={category,pie:pie&&!data.fallbackFromPie,final,question:data.question,revealed:false};
-    if(pie&&!data.fallbackFromPie){setGame(g=>({...g,...next,phase:'pieIntro'}));await wait(3000);}
+    const next={category,pie:pie&&!data.fallbackFromPie,final,challenge:!!isChallenge,question:data.question,revealed:false};
+    if(pie&&!data.fallbackFromPie){setGame(g=>({...g,...next,phase:'pieIntro'}));return;}
     if(alive.current)setGame(g=>({...g,...next,phase:'question'}));
   }catch(e){if(alive.current)setError(e.message+' — choose Retry question.');}
   finally{lock.current=false;if(alive.current)setBusy(false);}
  }
- async function move(id){if(lock.current||!allowed.includes(id))return;const n=BOARD[id];const positions=[...game.positions];positions[game.active]=id;
-  setGame(g=>({...g,positions,phase:'landing',category:n.category||null,pie:n.kind==='pie',final:false,roll:null}));
-  if(n.kind==='roll'){setGame(g=>({...g,positions,phase:'board',roll:null}));return;}
-  if(n.kind==='hub'){setGame(g=>({...g,positions,phase:'category',final:g.wedges[g.active].length===6,roll:null}));return;}
-  await ask(n.category,n.kind==='pie');
+ async function resolveLanding(id,isChallenge=false){
+  const n=BOARD[id];stopSpeech();
+  setGame(g=>({...g,phase:'landing',challenge:isChallenge,category:n.category||null,pie:!isChallenge&&n.kind==='pie',final:false,roll:null}));
+  if(!isChallenge&&n.kind==='roll'){setGame(g=>({...g,phase:'board',roll:null,challenge:false}));return;}
+  if(n.kind==='hub'){setGame(g=>({...g,phase:'category',final:false,challenge:isChallenge}));return;}
+  await ask(n.category,!isChallenge&&n.kind==='pie',false,isChallenge);
+ }
+ async function move(id){
+  if(lock.current||!allowed.includes(id))return;
+  const positions=[...game.positions];positions[game.active]=id;
+  const collision=id===game.positions[1-game.active];
+  setGame(g=>({...g,positions,pendingId:id,phase:collision?'challengeOffer':'landing',challenge:false,question:null,roll:null}));
+  if(!collision)await resolveLanding(id);
+ }
+ function removeChallengeWedge(category){
+  setGame(g=>{
+    if(g.phase!=='challengePick'||!g.wedges[g.removeFrom].includes(category))return g;
+    const wedges=g.wedges.map(w=>[...w]);wedges[g.removeFrom]=wedges[g.removeFrom].filter(c=>c!==category);
+    const active=g.afterChallengeActive,final=wedges[active].length===6;
+    return {...g,wedges,active,phase:final?'category':'board',final,challenge:false,question:null,revealed:false};
+  });
  }
  async function answer(correct){if(lock.current||!game.revealed)return;effectsContext();lock.current=true;setBusy(true);setError('');stopSpeech();
   try{if(!game.steal)await markAnswered(game.question.id);feedback(correct);
    setGame(g=>{
     const wedges=g.wedges.map(w=>[...w]),scores=[...g.scores];
+    if(g.challenge){
+      if(correct)scores[g.active]++;
+      const removeFrom=correct?1-g.active:g.active,chooserTeam=1-removeFrom;
+      const active=correct?g.active:1-g.active;
+      return {...g,scores,question:null,revealed:false,pie:false,steal:false,
+        phase:wedges[removeFrom].length?'challengePick':wedges[active].length===6?'category':'board',
+        final:!wedges[removeFrom].length&&wedges[active].length===6,
+        challenge:wedges[removeFrom].length>0,removeFrom,chooserTeam,afterChallengeActive:active,
+        active:wedges[removeFrom].length?g.active:active};
+    }
+    const earned=correct&&g.pie&&!wedges[g.active].includes(g.category);
     if(correct){
       scores[g.active]++;
       if(g.steal&&wedges[g.active].includes(g.category)&&wedges[g.stealFrom].length){
@@ -112,7 +154,8 @@ export default function BoardGame(){
     const nextActive=correct||g.steal?g.active:1-g.active;
     const finalReady=wedges[nextActive].length===6;
     return {...g,wedges,scores,active:nextActive,
-      phase:correct&&g.final?'winner':finalReady?'category':'board',
+      phase:correct&&g.final?'winner':earned?'wedgeWin':finalReady?'category':'board',
+      afterCelebrate:finalReady?'category':'board',celebrateCategory:g.category,
       question:null,revealed:false,pie:false,final:finalReady,steal:false,stealFrom:null,roll:null};
    });
   }catch(e){setError('Could not save the answer. Please try again. '+e.message);}
@@ -124,7 +167,7 @@ export default function BoardGame(){
     const wedges=g.wedges.map(w=>[...w]);wedges[g.stealFrom]=wedges[g.stealFrom].filter(c=>c!==category);
     if(!wedges[g.active].includes(category))wedges[g.active].push(category);
     const finalReady=wedges[g.active].length===6;
-    return {...g,wedges,phase:finalReady?'category':'board',final:finalReady,pie:false,steal:false,stealFrom:null,roll:null};
+    return {...g,wedges,phase:'wedgeWin',afterCelebrate:finalReady?'category':'board',celebrateCategory:category,final:finalReady,pie:false,steal:false,stealFrom:null,roll:null};
   });
  }
  function reset(){if(window.confirm('Start a new game? This clears the current board and wedges.')){stopSpeech();localStorage.removeItem(SAVE);setGame(fresh());setError('');}}
@@ -135,15 +178,19 @@ export default function BoardGame(){
    <aside className="game-panel"><div className="team-scores">{TEAMS.map((t,i)=><div key={t.name} className={`team-score ${game.active===i?'active-team':''}`}><strong><TokenIcon team={i}/> {t.name}</strong><span>{game.scores[i]} correct</span><PieTracker wedges={game.wedges[i]} team={i}/><small>{game.wedges[i].length} / 6 wedges</small></div>)}</div>
     {error&&<div role="alert" className="error">{error}{game.phase==='landing'&&<button onClick={()=>ask(game.category,game.pie,game.final)} disabled={busy}>Retry question</button>}</div>}
     {game.phase==='board'&&<div className="turn-controls"><Die value={die}/><h2>{'Roll the die'}</h2><p>Move along the rim or take a shortcut through the centre.</p><button className="primary" onClick={roll} disabled={rolling}>{rolling?'Rolling…':'Roll die'}</button></div>}
-    {game.phase==='move'&&<div className="turn-controls"><Die value={game.roll}/><h2>Move {game.roll} spaces</h2><p>Select a glowing space on the board.</p><div className="destination-list">{allowed.map(id=><button key={id} onClick={()=>move(id)} disabled={busy}>{BOARD[id].kind==='hub'?'Centre':BOARD[id].kind==='roll'?'Roll again':BOARD[id].category}{BOARD[id].kind==='pie'?' · Wedge':''}</button>)}</div></div>}
+    {game.phase==='move'&&<div className="turn-controls"><Die value={game.roll}/><h2>Move {game.roll} spaces</h2><p>Select a glowing space on the board.</p></div>}
+    {game.phase==='challengeOffer'&&<section className="challenge-offer"><span className="eyebrow">SAME SPACE · CHALLENGE OPPORTUNITY</span><h2>{team.name}, do you want to challenge?</h2><p>Get it right: choose one of their pies to discard. Get it wrong: they choose one of yours to discard. No pies are transferred.</p><div className="answer-buttons"><button className="correct" disabled={busy} onClick={()=>resolveLanding(game.pendingId,true)}>Challenge!</button><button disabled={busy} onClick={()=>resolveLanding(game.pendingId,false)}>No challenge</button></div></section>}
+    {game.phase==='challengePick'&&<section><span className="eyebrow">CHALLENGE RESULT</span><h2>{TEAMS[game.chooserTeam].name}, choose a {TEAMS[game.removeFrom].name} pie to discard.</h2><div className="category-buttons">{game.wedges[game.removeFrom].map(c=><button key={c} style={{borderColor:COLORS[c]}} onClick={()=>removeChallengeWedge(c)}>{c}</button>)}</div></section>}
     {game.phase==='stealPick'&&<div><span className="eyebrow">BONUS STEAL</span><h2>You already have that pie. Choose an opponent’s pie to steal.</h2><div className="category-buttons">{game.wedges[game.stealFrom].map(c=><button key={c} style={{borderColor:COLORS[c]}} onClick={()=>stealWedge(c)}>{c}</button>)}</div></div>}
     {game.phase==='category'&&<div><span className="eyebrow">{game.final?'FINAL QUESTION · OPPONENT CHOOSES':'CENTRE SPACE'}</span><h2>{game.final?`${TEAMS[1-game.active].name}, choose their final category`:'Which colour will you play?'}</h2><div className="category-buttons">{CATS.map(c=><button key={c} disabled={busy} style={{borderColor:COLORS[c]}} onClick={()=>ask(c,false,game.final)}>{c}</button>)}</div></div>}
     {game.phase==='landing'&&<div><p role="status">{busy?'Finding your question…':'Your token has landed.'}</p>{!busy&&!error&&<button className="primary" onClick={()=>ask(game.category,game.pie,game.final)}>Get question</button>}</div>}
-    {game.phase==='question'&&game.question&&<section className="question-panel"><div className="question-heading"><span className="eyebrow" style={{color:COLORS[game.category]}}>{game.final?'FINAL QUESTION':game.steal?'STEAL · '+game.category:game.pie?'WEDGE QUESTION':game.category}</span><button className="quiet" aria-label={speaking?'Stop narration':'Read question again'} onClick={()=>speaking?stopSpeech():say(game.question.question)}>{speaking?'Stop voice':'Read aloud'}</button></div><h2>{game.question.question}</h2>{game.revealed?<><div className="answer">{game.question.answer}</div><div className="answer-buttons"><button className="correct" disabled={busy} onClick={()=>answer(true)}>✓ Correct</button><button className="wrong" disabled={busy} onClick={()=>answer(false)}>✕ Incorrect</button></div></>:<button className="primary" disabled={busy} onClick={()=>{stopSpeech();setGame(g=>({...g,revealed:true}));}}>Reveal answer</button>}</section>}
+    {game.phase==='question'&&game.question&&<section className="question-panel"><div className="question-heading"><span className="eyebrow" style={{color:COLORS[game.category]}}>{game.challenge?'CHALLENGE QUESTION':game.final?'FINAL QUESTION':game.steal?'STEAL · '+game.category:game.pie?'WEDGE QUESTION':game.category}</span><button className="quiet" aria-label={speaking?'Stop narration':'Read question again'} onClick={()=>speaking?stopSpeech():say(game.question.question)}>{speaking?'Stop voice':'Read aloud'}</button></div><h2>{game.question.question}</h2>{game.revealed?<><div className="answer">{game.question.answer}</div><div className="answer-buttons"><button className="correct" disabled={busy} onClick={()=>answer(true)}>✓ Correct</button><button className="wrong" disabled={busy} onClick={()=>answer(false)}>✕ Incorrect</button></div></>:<button className="primary" disabled={busy} onClick={()=>{stopSpeech();setGame(g=>({...g,revealed:true}));}}>Reveal answer</button>}</section>}
+
     <CategoryCard/>
-    <details className="board-key"><summary>Board rules</summary><p>Glowing spaces are exactly one die roll away. No reversing within a move. A die space grants another roll. Correct answers grant another turn; incorrect answers pass the turn. Wedge spaces ask a pie question. A missed pie question can be stolen by the other team. If they already own that pie, they can take one of the opponent’s pies instead. Collect all six wedges to immediately enter the final round; the other team chooses your category. A correct final answer wins. A wrong final answer passes the turn; you keep your pies.</p></details>
+    <details className="board-key"><summary>Board rules</summary><p>Glowing spaces are exactly one die roll away. No reversing within a move. A die space grants another roll. Correct answers grant another turn; incorrect answers pass the turn. Wedge spaces ask a pie question. Land on your opponent to optionally challenge them: the winner chooses one of the loser’s pies to discard. A missed pie question can be stolen by the other team. If they already own that pie, they can take one of the opponent’s pies instead. Collect all six wedges to immediately enter the final round; the other team chooses your category. A correct final answer wins. A wrong final answer passes the turn; you keep your pies.</p></details>
    </aside></div>
   {game.phase==='pieIntro'&&<div className="wedge-intro" style={{'--wedge-color':COLORS[game.category]}}><div className="big-wedge">◀</div><span className="eyebrow">FOR THE WEDGE</span><h1>{game.category}</h1><p><TokenIcon team={game.active}/> {team.name}, get ready.</p></div>}
+  {game.phase==='wedgeWin'&&<div className="wedge-celebration" style={{'--wedge-color':COLORS[game.celebrateCategory]}}>{Array.from({length:40},(_,i)=><i className="confetti" key={i} style={{left:`${i*2.5}%`,background:COLORS[KEY_CATEGORIES[i%6]],animationDelay:`${(i%7)*.12}s`,transform:`rotate(${i*37}deg)`}}/>)}<div className="celebration-pie"><PieTracker team={game.active} wedges={game.wedges[game.active]}/></div><span className="eyebrow">PIE WEDGE WON!</span><h1>{team.name} win {game.celebrateCategory}!</h1></div>}
   {game.phase==='winner'&&<div className="winner-overlay"><h1>{team.name} win!</h1><p>Six wedges. One final answer. Game night champions.</p><button className="primary" onClick={reset}>Play again</button></div>}
  </main>;
 }

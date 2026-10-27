@@ -58,4 +58,23 @@ function playIncorrect(ctx) {
   playTone(ctx, 131, t+.4, .45, 'sine', .16);
 }
 
-export {createAudioCtx, playCorrect, playIncorrect, playDiceRoll};
+function playWedgeWon(ctx) {
+  if (!ctx) return;
+  const t = ctx.currentTime;
+  [261, 329, 392, 523, 659, 784, 1047].forEach((f, i) =>
+    playTone(ctx, f, t + i * 0.08, 0.18, 'triangle', 0.2)
+  );
+  [523, 659, 784, 1047].forEach(f =>
+    playTone(ctx, f, t + 0.62, 1.5, 'sine', 0.16)
+  );
+  [0, 0.18, 0.36, 0.54].forEach(offset =>
+    playTone(ctx, 880, t + 0.65 + offset, 0.1, 'square', 0.1)
+  );
+  // Extra high shimmer
+  [1318, 1568, 2093].forEach((f, i) =>
+    playTone(ctx, f, t + 0.8 + i * 0.12, 0.3, 'sine', 0.08)
+  );
+}
+
+
+export {playWedgeWon,createAudioCtx, playCorrect, playIncorrect, playDiceRoll};

@@ -18,7 +18,7 @@ router.post('/auth/login', login);
 
 // ── TTS ───────────────────────────────────────────────────────────────────────
 router.post('/tts', async (req, res) => {
-  const { text, voice = 'nova' } = req.body;
+  const { text, voice = 'nova', announcement = false } = req.body;
   if (!text) return res.status(400).json({ error: 'text required' });
   if (!process.env.OPENAI_API_KEY) return res.status(503).json({ error: 'TTS not configured — set OPENAI_API_KEY' });
 
@@ -27,7 +27,8 @@ router.post('/tts', async (req, res) => {
   try {
     const openai = getOpenAI();
     const mp3 = await openai.audio.speech.create({
-      model: 'tts-1',
+      model: announcement === true ? 'gpt-4o-mini-tts' : 'tts-1',
+      ...(announcement === true ? {instructions: 'Shout this line joyfully and emphatically like an excited game-show host announcing a big moment. Strong projection, animated intonation and emphasis. Speak exactly the supplied words; no extra words.'} : {}),
       voice: safeVoice,
       input: text.slice(0, 4096),
       speed: 0.95,
