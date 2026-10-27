@@ -5,6 +5,8 @@ import {
   triggerRefill, getRefillStatus, getCategories_a,
 } from '../api';
 
+const DEFAULT_CATEGORIES = ['Geography', 'TV, Movies & Music', 'History', 'Science & Nature', 'Sports & Games', 'Pop Culture & Current Events'];
+
 const INITIAL_FORM = { category: '', question: '', answer: '', is_pie: false, canadian: false };
 
 export default function AdminPanel() {
@@ -17,7 +19,7 @@ export default function AdminPanel() {
   const [totalPages, setTotalPages] = useState(1);
   const [page,       setPage]       = useState(1);
   const [filters,    setFilters]    = useState({ category: '', used: '', search: '', isPie: '' });
-  const [categories, setCategories] = useState([]);
+  const [categories, setCategories] = useState(DEFAULT_CATEGORIES);
   const [form,       setForm]       = useState(INITIAL_FORM);
   const [editing,    setEditing]    = useState(null);
   const [formErr,    setFormErr]    = useState('');
@@ -65,7 +67,12 @@ export default function AdminPanel() {
   }, [page, filters]);
 
   const loadCategories = useCallback(async () => {
-    try { const d = await getCategories_a(); setCategories(d.categories); } catch {}
+    try {
+      const d = await getCategories_a();
+      if (Array.isArray(d.categories) && d.categories.length) setCategories(d.categories);
+    } catch (err) {
+      console.warn('Using default trivia categories:', err.message);
+    }
   }, []);
 
   useEffect(() => {
