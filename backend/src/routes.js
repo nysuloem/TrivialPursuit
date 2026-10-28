@@ -101,10 +101,11 @@ router.post('/game/question', async (req, res) => {
     const excludeSubcats = recentSubcats[category] || [];
     const question = await db.getQuestion(category, isPie, eraTarget, excludeSubcats);
     if (!question) {
-      if (isPie) {
-        const fallback = await db.getQuestion(category, false);
+      // Borrow from the other pool while the board space keeps its rules.
+      {
+        const fallback = await db.getQuestion(category, !isPie);
         if (fallback) {
-          return res.json({ question: fallback, fallbackFromPie: true });
+          return res.json({ question: fallback, fallbackFromPie: isPie, fallbackFromRegular: !isPie });
         }
       }
       return res.status(404).json({ error: 'No questions available for this category' });

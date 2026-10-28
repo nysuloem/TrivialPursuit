@@ -2,7 +2,7 @@
 const CATS = ['History','TV, Movies & Music','Science & Nature','Sports & Games','Geography','Pop Culture & Current Events'];
 const RIM = [0,3,null,2,5,null,4,1,4,null,3,0,null,5,2,5,null,4,1,null,0,3,0,null,5,2,null,1,4,1,null,0,3,null,2,5,2,null,1,4,null,3];
 const SPOKES = [[5,1,2,4,3],[0,2,3,5,4],[1,3,4,0,5],[2,4,5,1,0],[3,5,0,2,1],[4,0,1,3,2]];
-const COLORS = {'History':'#edca28','TV, Movies & Music':'#dc468b','Science & Nature':'#29986b','Sports & Games':'#8662ae','Geography':'#388ec9','Pop Culture & Current Events':'#e88539'};
+const COLORS = {'History':'#edca28','TV, Movies & Music':'#dc468b','Science & Nature':'#29986b','Sports & Games':'#8662ae','Geography':'#388ec9','Pop Culture & Current Events':'#d66c27'};
 const BOARD = {hub:{id:'hub',x:500,y:500,kind:'hub',neighbors:[]}};
 const point = (r,a) => ({x:500+r*Math.cos(a),y:500+r*Math.sin(a)});
 for(let i=0;i<42;i++) {

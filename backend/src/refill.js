@@ -41,8 +41,7 @@ const DIFFICULTY_CYCLE = ['medium', 'medium', 'easy', 'medium', 'pie', 'medium']
 
 const ERA_POOLS = {
   'TV, Movies & Music': [
-    '1980s', '1990s', '2000s', '2010s', '2020s',
-    '1990s', '2000s', '1980s', '2020s', 'timeless',
+    '1970s', '1980s', '1990s', '2000s', '2010s', '2020s',
   ],
   'Sports & Games': [
     '1980s', '1990s', '2000s', '2010s', '2020s',
@@ -1534,7 +1533,14 @@ function buildSlotsForCategory(category, batchNum, desiredCount, pieCategory) {
     extensionIndex++;
   }
 
-  return slots.slice(0, desiredCount);
+  const selected = slots.slice(0, desiredCount);
+  if (category === 'TV, Movies & Music') {
+    // Contiguous balanced decades; manual generation advances batchNum by six.
+    selected.forEach((slot, i) => {
+      slot.era = eraPool[(i + Math.floor(batchNum / 6)) % eraPool.length];
+    });
+  }
+  return selected;
 }
 
 function buildSearchQuery(slot) {
